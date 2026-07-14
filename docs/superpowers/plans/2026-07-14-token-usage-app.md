@@ -184,9 +184,9 @@ mod tests {
 
     #[test]
     fn iso8601_parses_to_epoch() {
-        // 2026-07-14T03:29:59.895126+00:00 → 1784000999
+        // 2026-07-14T03:29:59.895126+00:00 → 1783999799
         let e = iso8601_to_epoch("2026-07-14T03:29:59.895126+00:00").unwrap();
-        assert_eq!(e, 1784000999);
+        assert_eq!(e, 1783999799);
     }
 
     #[test]
@@ -349,7 +349,7 @@ mod tests {
         assert_eq!(s.windows.len(), 3);
         let session = s.windows.iter().find(|w| w.id == WindowId::ClaudeSession).unwrap();
         assert_eq!(session.used_percent, 6.0);
-        assert_eq!(session.resets_at, Some(1784000999));
+        assert_eq!(session.resets_at, Some(1783999799));
         let fable = s.windows.iter().find(|w| w.id == WindowId::ClaudeWeeklyFable).unwrap();
         assert!(fable.available);
         assert_eq!(fable.used_percent, 0.0);
