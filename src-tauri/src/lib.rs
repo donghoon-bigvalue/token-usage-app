@@ -21,20 +21,23 @@ pub fn run() {
         .setup(|app| {
             poller::start(app.handle().clone());
 
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click { .. } = event {
-                        if let Some(win) = tray.app_handle().get_webview_window("main") {
-                            let _ = if win.is_visible().unwrap_or(false) {
-                                win.hide()
-                            } else {
-                                win.show().and_then(|_| win.set_focus())
-                            };
-                        }
+            let mut tray = TrayIconBuilder::new().on_tray_icon_event(|tray, event| {
+                if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                    if let Some(win) = tray.app_handle().get_webview_window("main") {
+                        let _ = if win.is_visible().unwrap_or(false) {
+                            win.hide()
+                        } else {
+                            win.show().and_then(|_| win.set_focus())
+                        };
                     }
-                })
-                .build(app)?;
+                }
+            });
+            // Only set the icon if one is bundled; a missing icon shouldn't
+            // panic app startup.
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            let _tray = tray.build(app)?;
 
             if let Some(win) = app.get_webview_window("main") {
                 let handle = app.handle().clone();

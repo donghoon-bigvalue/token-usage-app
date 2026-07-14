@@ -13,7 +13,11 @@ pub async fn get_usage() -> UsageReport {
 
 #[tauri::command]
 pub fn get_settings(app: AppHandle) -> Settings {
-    let store = app.store(STORE_FILE).expect("store");
+    // Degrade to defaults if the store can't be opened (disk/permission/corruption)
+    // rather than panicking the command.
+    let Ok(store) = app.store(STORE_FILE) else {
+        return Settings::default();
+    };
     match store.get(KEY) {
         Some(v) => serde_json::from_value(v).map(sanitize).unwrap_or_default(),
         None => Settings::default(),
@@ -23,8 +27,13 @@ pub fn get_settings(app: AppHandle) -> Settings {
 #[tauri::command]
 pub fn set_settings(app: AppHandle, settings: Settings) -> Settings {
     let clean = sanitize(settings);
-    let store = app.store(STORE_FILE).expect("store");
-    store.set(KEY, serde_json::to_value(&clean).unwrap());
-    let _ = store.save();
+    // Persist best-effort; a store/serialization failure returns the sanitized
+    // value to the caller without panicking.
+    if let Ok(store) = app.store(STORE_FILE) {
+        if let Ok(value) = serde_json::to_value(&clean) {
+            store.set(KEY, value);
+            let _ = store.save();
+        }
+    }
     clean
 }

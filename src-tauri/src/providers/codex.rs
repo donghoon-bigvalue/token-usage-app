@@ -14,6 +14,19 @@ pub enum CodexError {
     Parse(String),
 }
 
+impl CodexError {
+    /// Stable, generic message safe to surface to the frontend. The `Display`
+    /// impl above keeps verbose parse detail for internal use only — never send
+    /// it across the IPC boundary.
+    pub fn user_message(&self) -> &'static str {
+        match self {
+            CodexError::NoCredentials => "credentials not found",
+            CodexError::NoRollout => "no usage data",
+            CodexError::Parse(_) => "invalid data",
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct RateLimits {
     primary: Option<Bucket>,
@@ -134,10 +147,17 @@ fn walk_jsonl(root: &Path) -> Vec<PathBuf> {
     while let Some(dir) = stack.pop() {
         if let Ok(rd) = std::fs::read_dir(&dir) {
             for e in rd.flatten() {
+                // Use the dir entry's own file type (does NOT follow symlinks),
+                // and skip symlinked entries so a planted link can't redirect the
+                // walk outside ~/.codex/sessions.
+                let Ok(ft) = e.file_type() else { continue };
+                if ft.is_symlink() {
+                    continue;
+                }
                 let p = e.path();
-                if p.is_dir() {
+                if ft.is_dir() {
                     stack.push(p);
-                } else if p.extension().map(|x| x == "jsonl").unwrap_or(false) {
+                } else if ft.is_file() && p.extension().map(|x| x == "jsonl").unwrap_or(false) {
                     out.push(p);
                 }
             }
