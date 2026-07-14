@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783988850587,
+  "projectRoot": "/home/bv_leedonghoon/orca/workspaces/token-usage-app/issue-1-claude-codex",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "cd /home/bv_leedonghoon/orca/workspaces/token-usage-app/issue-1-claude-codex\ngit add -A\necho \"=== staged files (excluding to check for accidental target/node_modules) ===\"\ngit status --short | grep -iE \"target/|node_modules/\" | head; echo \"^ (should be empty)\"\necho \"=== count of staged files ===\"\ngit diff --cached --name-only | wc -l\necho \"=== key files present in staging ===\"\ngit diff --cached --name-only | grep -E \"package.json|Cargo.toml|vitest.config.ts|test-setup|\\.cargo/config.toml|package-lock.json\" \necho \"=== confirm docs/.superpowers/.omc NOT deleted ===\"\ngit status --short | grep -iE \"^D\" | head; echo \"^ (should be empty - no deletions)\"\nls docs .superpowers .omc >/dev/null 2>&1 && echo \"docs/.superpowers/.omc all still exist\"",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {},
+  "hotPaths": [
+    {
+      "path": "src-tauri/Cargo.toml",
+      "accessCount": 2,
+      "lastAccessed": 1783990417814,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 2,
+      "lastAccessed": 1783990436709,
+      "type": "file"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-07-14-token-usage-app-design.md",
+      "accessCount": 1,
+      "lastAccessed": 1783989497001,
+      "type": "file"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-14-token-usage-app.md",
+      "accessCount": 1,
+      "lastAccessed": 1783990030834,
+      "type": "file"
+    },
+    {
+      "path": ".superpowers/sdd/progress.md",
+      "accessCount": 1,
+      "lastAccessed": 1783990221369,
+      "type": "file"
+    },
+    {
+      "path": ".superpowers/sdd/task-0-brief.md",
+      "accessCount": 1,
+      "lastAccessed": 1783990267117,
+      "type": "file"
+    },
+    {
+      "path": "vitest.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1783990426528,
+      "type": "file"
+    },
+    {
+      "path": "src/test-setup.ts",
+      "accessCount": 1,
+      "lastAccessed": 1783990430733,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "accessCount": 1,
+      "lastAccessed": 1783990468338,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "accessCount": 1,
+      "lastAccessed": 1783990493423,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri/src/main.rs",
+      "accessCount": 1,
+      "lastAccessed": 1783990498340,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri/.cargo/config.toml",
+      "accessCount": 1,
+      "lastAccessed": 1783990834975,
+      "type": "file"
+    },
+    {
+      "path": ".superpowers/sdd/task-0-report.md",
+      "accessCount": 1,
+      "lastAccessed": 1783990989742,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

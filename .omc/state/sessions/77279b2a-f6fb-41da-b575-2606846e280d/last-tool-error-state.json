@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"pkill -f \\\"brew install pkgconf webkitgtk\\\" 2>&1; echo \\\"killed brew if running\\\"; which pkg-config; ls /usr/lib/x86_64-linux-gnu/pkgconfig/*.pc 2>/dev/null | grep -iE \\\"webkit|gtk|rsvg|ap...",
+  "error": "Exit code 144",
+  "timestamp": "2026-07-14T01:00:14.813Z",
+  "retry_count": 1
+}
