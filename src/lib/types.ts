@@ -2,7 +2,6 @@ export type WindowId =
   | "claude_session"
   | "claude_weekly_all"
   | "claude_weekly_fable"
-  | "codex_five_hour"
   | "codex_weekly"
   | "codex_spark_weekly";
 
