@@ -16,3 +16,12 @@ export function formatCountdown(
   if (d > 0) return `resets in ${d}d ${h}h ${m}m`;
   return h > 0 ? `resets in ${h}h ${m}m` : `resets in ${m}m`;
 }
+
+export function formatTokens(n: number): string {
+  return new Intl.NumberFormat().format(n);
+}
+
+export function formatUsd(n: number | null): string {
+  if (n === null) return "—";
+  return `$${n.toFixed(2)}`;
+}

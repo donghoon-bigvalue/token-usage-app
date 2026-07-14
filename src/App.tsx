@@ -7,6 +7,7 @@ import type { UsageReport, Settings } from "./lib/types";
 import { Header } from "./components/Header";
 import { ProviderCard } from "./components/ProviderCard";
 import { SettingsPanel } from "./components/SettingsPanel";
+import UsageHistoryView from "./components/UsageHistoryView";
 import "./styles/theme.css";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   const [settings, setSettingsState] = useState<Settings | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [showSettings, setShowSettings] = useState(false);
+  const [view, setView] = useState<"limits" | "history">("limits");
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
@@ -57,15 +59,21 @@ export default function App() {
         onOpenSettings={() => setShowSettings((v) => !v)}
         updatedAt={report?.claude.updated_at ?? null}
         locale={locale}
+        view={view}
+        onViewChange={setView}
       />
       {showSettings && settings && (
         <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />
       )}
-      {report && (
-        <div className="app__cards">
-          <ProviderCard snapshot={report.claude} now={now} locale={locale} />
-          <ProviderCard snapshot={report.codex} now={now} locale={locale} />
-        </div>
+      {view === "limits" ? (
+        report && (
+          <div className="app__cards">
+            <ProviderCard snapshot={report.claude} now={now} locale={locale} />
+            <ProviderCard snapshot={report.codex} now={now} locale={locale} />
+          </div>
+        )
+      ) : (
+        <UsageHistoryView />
       )}
     </main>
   );

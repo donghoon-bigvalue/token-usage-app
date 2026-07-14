@@ -8,5 +8,20 @@
     "codex_weekly": "Weekly limit",
     "codex_spark_weekly": "Spark weekly limit"
   },
-  "settings": { "language": "Language", "theme": "Theme", "light": "Light", "dark": "Dark", "system": "System", "interval": "Auto-refresh (seconds)", "thresholds": "Notify at (%)" }
+  "settings": { "language": "Language", "theme": "Theme", "light": "Light", "dark": "Dark", "system": "System", "interval": "Auto-refresh (seconds)", "thresholds": "Notify at (%)" },
+  "history": {
+    "tab": "Usage history",
+    "limitsTab": "Limits",
+    "thisMonth": "This month",
+    "tokens": "Tokens",
+    "cost": "Est. cost",
+    "download": "Download CSV",
+    "empty": "No usage records yet",
+    "estimateNote": "Cost is an API-rate estimate (unrelated to your subscription bill)",
+    "notEstimable": "some model prices unlisted",
+    "colMonth": "Month",
+    "colProvider": "Service",
+    "colTokens": "Tokens",
+    "colCost": "Est. cost ($)"
+  }
 }
