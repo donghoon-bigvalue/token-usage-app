@@ -73,6 +73,18 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String) -> UsageHisto
     UsageHistory { current_month, summaries, details }
 }
 
+/// Minimal RFC-4180 escaping: wrap the field in double quotes (doubling any
+/// internal quotes) when it contains a comma, quote, or newline; otherwise
+/// emit it as-is. Only `model` is free-form user/CLI-supplied text — every
+/// other CSV field here is a controlled enum or number.
+fn csv_escape(field: &str) -> String {
+    if field.contains(',') || field.contains('"') || field.contains('\n') || field.contains('\r') {
+        format!("\"{}\"", field.replace('"', "\"\""))
+    } else {
+        field.to_string()
+    }
+}
+
 /// Detail rows as CSV (one header + one row per detail).
 pub fn to_csv(history: &UsageHistory) -> String {
     let mut s = String::from(
@@ -83,7 +95,7 @@ pub fn to_csv(history: &UsageHistory) -> String {
         let cost = d.cost_usd.map(|c| format!("{c:.4}")).unwrap_or_default();
         s.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{}\n",
-            d.year_month, provider, d.model,
+            d.year_month, provider, csv_escape(&d.model),
             d.input_tokens, d.output_tokens, d.cache_write_tokens, d.cache_read_tokens,
             d.cached_input_tokens, d.total_tokens, cost,
         ));
@@ -157,5 +169,19 @@ mod tests {
             "year_month,provider,model,input_tokens,output_tokens,cache_write_tokens,cache_read_tokens,cached_input_tokens,total_tokens,cost_usd");
         let row = lines.next().unwrap();
         assert!(row.starts_with("2026-07,claude,claude-haiku-4-5,1000000,0,0,0,0,1000000,"));
+    }
+
+    #[test]
+    fn csv_escapes_model_field_with_special_chars() {
+        let recs = vec![claude_rec("2026-07", "weird,model\"x", 1_000_000, 0, 0, 0)];
+        let h = aggregate(recs, "2026-07".into());
+        let csv = to_csv(&h);
+        let row = csv.lines().nth(1).unwrap();
+        // The escaped model field must appear verbatim as its own CSV field:
+        // quoted, with the internal quote doubled.
+        assert!(row.contains("\"weird,model\"\"x\""));
+        // And the row must retain exactly 10 comma-separated top-level fields
+        // (the escaped field's internal comma/quotes must not split it).
+        assert!(row.starts_with("2026-07,claude,\"weird,model\"\"x\","));
     }
 }

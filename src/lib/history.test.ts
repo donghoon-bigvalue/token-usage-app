@@ -13,7 +13,7 @@ describe("history lib", () => {
   it("getUsageHistory invokes the command", async () => {
     invoke.mockResolvedValue({ current_month: "2026-07", summaries: [], details: [] });
     const h = await getUsageHistory();
-    expect(invoke).toHaveBeenCalledWith("get_usage_history");
+    expect(invoke).toHaveBeenCalledWith("get_usage_history", { refresh: false });
     expect(h.current_month).toBe("2026-07");
   });
 

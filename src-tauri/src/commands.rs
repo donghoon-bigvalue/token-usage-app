@@ -39,14 +39,43 @@ pub fn set_settings(app: AppHandle, settings: Settings) -> Settings {
     clean
 }
 
+/// In-memory cache of the aggregated usage history for the app session
+/// (issue #19 §6). Populated on first `get_usage_history` call and reused
+/// until an explicit `refresh` is requested.
+#[derive(Default)]
+pub struct UsageCache(pub std::sync::Mutex<Option<UsageHistory>>);
+
 #[tauri::command]
-pub fn get_usage_history() -> UsageHistory {
-    crate::history::build_history()
+pub async fn get_usage_history(
+    cache: tauri::State<'_, UsageCache>,
+    refresh: bool,
+) -> Result<UsageHistory, String> {
+    if !refresh {
+        if let Some(h) = cache.0.lock().unwrap().clone() {
+            return Ok(h);
+        }
+    }
+    // Disk scan runs off the main thread so the UI never freezes on a
+    // large history.
+    let history = tokio::task::spawn_blocking(crate::history::build_history)
+        .await
+        .map_err(|e| e.to_string())?;
+    *cache.0.lock().unwrap() = Some(history.clone());
+    Ok(history)
 }
 
 #[tauri::command]
-pub fn export_usage_csv(path: String) -> Result<(), String> {
-    let history = crate::history::build_history();
+pub async fn export_usage_csv(
+    cache: tauri::State<'_, UsageCache>,
+    path: String,
+) -> Result<(), String> {
+    let cached = cache.0.lock().unwrap().clone();
+    let history = match cached {
+        Some(h) => h,
+        None => tokio::task::spawn_blocking(crate::history::build_history)
+            .await
+            .map_err(|e| e.to_string())?,
+    };
     let csv = crate::history::to_csv(&history);
     std::fs::write(&path, csv).map_err(|e| e.to_string())
 }

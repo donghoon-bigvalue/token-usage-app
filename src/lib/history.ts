@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { UsageHistory } from "./types";
 
-export function getUsageHistory(): Promise<UsageHistory> {
-  return invoke<UsageHistory>("get_usage_history");
+export function getUsageHistory(refresh = false): Promise<UsageHistory> {
+  return invoke<UsageHistory>("get_usage_history", { refresh });
 }
 
 /**

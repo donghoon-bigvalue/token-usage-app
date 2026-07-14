@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import "../i18n";
 
 const getUsageHistory = vi.fn();
@@ -33,5 +33,20 @@ describe("UsageHistoryView", () => {
     getUsageHistory.mockResolvedValue({ current_month: "2026-07", summaries: [], details: [] });
     render(<UsageHistoryView />);
     await waitFor(() => expect(getUsageHistory).toHaveBeenCalled());
+  });
+
+  it("calls downloadUsageCsv when the download button is clicked", async () => {
+    getUsageHistory.mockResolvedValue({
+      current_month: "2026-07",
+      summaries: [
+        { year_month: "2026-07", provider: "claude", total_tokens: 1234567, cost_usd: 12.34, cost_estimable: true },
+      ],
+      details: [],
+    });
+    downloadUsageCsv.mockResolvedValue(true);
+    render(<UsageHistoryView />);
+    const button = await screen.findByText("Download CSV");
+    fireEvent.click(button);
+    await waitFor(() => expect(downloadUsageCsv).toHaveBeenCalled());
   });
 });

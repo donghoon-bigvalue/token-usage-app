@@ -97,6 +97,7 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 /* Usage history view */
 .history-view { display: flex; flex-direction: column; gap: 14px; }
 .history-current h2 { font-size: 15px; margin: 0 0 8px; }
+.history-refresh { align-self: flex-start; margin-bottom: 8px; }
 .history-cards { display: flex; gap: 12px; }
 .history-card {
   flex: 1;

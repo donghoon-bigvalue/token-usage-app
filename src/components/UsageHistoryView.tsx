@@ -13,6 +13,7 @@ export default function UsageHistoryView() {
   const { t } = useTranslation();
   const [history, setHistory] = useState<UsageHistory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -24,6 +25,18 @@ export default function UsageHistoryView() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const h = await getUsageHistory(true);
+      setHistory(h);
+    } catch {
+      // keep showing the last good history on a failed refresh
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading) return <div className="history-loading">…</div>;
   if (!history || history.summaries.length === 0) {
@@ -42,6 +55,9 @@ export default function UsageHistoryView() {
     <div className="history-view">
       <section className="history-current">
         <h2>{t("history.thisMonth")}</h2>
+        <button className="history-refresh" onClick={onRefresh} disabled={refreshing}>
+          {t("app.refresh")}
+        </button>
         <div className="history-cards">
           {providers.map((p) => {
             const s = current.find((c) => c.provider === p);
@@ -53,7 +69,12 @@ export default function UsageHistoryView() {
                 <span className="history-card-tokens">
                   {formatTokens(s?.total_tokens ?? 0)} {t("history.tokens")}
                 </span>
-                <span className="history-card-cost">{formatUsd(s ? s.cost_usd : 0)}</span>
+                <span className="history-card-cost">
+                  {formatUsd(s ? s.cost_usd : 0)}
+                  {s && !s.cost_estimable && (
+                    <span className="history-warn" title={t("history.notEstimable")}> ≈</span>
+                  )}
+                </span>
               </div>
             );
           })}

@@ -469,13 +469,24 @@ struct ScanUsage {
 
 fn walk_jsonl(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else { return out };
-    for e in entries.flatten() {
-        let p = e.path();
-        if p.is_dir() {
-            out.extend(walk_jsonl(&p));
-        } else if p.extension().map(|x| x == "jsonl").unwrap_or(false) {
-            out.push(p);
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for e in rd.flatten() {
+                // Use the dir entry's own file type (does NOT follow symlinks),
+                // and skip symlinked entries so a planted link can't create a
+                // cycle or redirect the walk outside ~/.claude/projects.
+                let Ok(ft) = e.file_type() else { continue };
+                if ft.is_symlink() {
+                    continue;
+                }
+                let p = e.path();
+                if ft.is_dir() {
+                    stack.push(p);
+                } else if ft.is_file() && p.extension().map(|x| x == "jsonl").unwrap_or(false) {
+                    out.push(p);
+                }
+            }
         }
     }
     out
