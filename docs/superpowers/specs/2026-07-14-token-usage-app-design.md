@@ -208,8 +208,16 @@ enum WindowId {
 - 다중 계정 전환.
 - 자동 업데이트(앱 자체 업데이트) 배포 파이프라인.
 
-## 9. 열린 확인 항목 (구현 중 해결)
+## 9. 열린 확인 항목 — 구현 스파이크(Task 6) 결과로 해결됨
 
-1. Codex 라이브 `/usage`가 Rust `reqwest`로 Cloudflare를 통과하는지 — 구현 최초 스파이크에서 검증. 실패 시 로컬 폴백을 1차로 승격.
-2. Spark 주간 한도가 라이브 응답 어디에 오는지 (per-model limit 배열 등) — 실제 응답 확인 후 매핑 확정.
-3. Claude `limits[]`에 Opus 등 다른 scoped 한도가 함께 오는 경우가 있는지 — 있으면 무시하고 Fable만 선택(이슈 범위).
+1. **Codex 라이브 `/usage` Cloudflare 통과 여부 → 통과 못함 (해결: rollout 1차 승격).**
+   `GET https://chatgpt.com/backend-api/codex/usage`는 curl **및 Rust reqwest** 모두 Cloudflare managed challenge(HTTP 403)를 받는다(브라우저 세션 없이는 불가). 애초에 Codex CLI도 별도 usage 엔드포인트를 쓰지 않고, 실제 `/responses` 스트림에 실려오는 `rate_limits`를 세션 rollout에 저장해 표시한다. 따라서 **최신 rollout 스냅샷을 Codex의 1차(사실상 유일) 소스로 사용**한다. 신선도는 Codex CLI 상태줄과 동일(마지막 API 턴 기준). `source`는 항상 `Cache`, `updated_at`은 판독값이 나온 rollout 파일의 mtime으로 truthful하게 표기.
+   - rollout에는 세션 중 `primary/secondary`가 `null`인 스냅샷도 섞여 있으므로, **파일 최신순 + 파일 내 역방향으로 primary 또는 secondary가 non-null인 가장 최근 판독값**을 선택한다.
+   - 한계: 사용자가 Codex를 오래 안 썼으면 데이터가 오래됐을 수 있다(예: 5시간 윈도우 판독값의 resets_at이 과거일 수 있음). 이는 Codex 자체의 한계와 동일하며 `updated_at`과 과거 resets_at 표기로 정직하게 드러낸다. 라이브 HTTP 시도는 매 새로고침 지연·slop만 유발하므로 제거함.
+2. **Spark 주간 한도 위치 → 로컬/라이브 어디에도 없음 (해결: unavailable 유지).**
+   로컬 rollout `rate_limits`에는 `primary`/`secondary`/`credits`/`plan_type`만 존재하고 Spark 전용·per-model 한도가 없다. 라이브 엔드포인트는 막혀 있다. 따라서 `CodexSparkWeekly`는 `available:false`("데이터 없음")로 표시한다 — 사용자와 합의한 best-effort 결과.
+3. **Claude `limits[]`의 다른 scoped 한도 → Fable만 선택(무시).** Task 2에서 `weekly_scoped` 중 `scope.model.display_name == "Fable"`만 매핑, 나머지는 무시(이슈 범위). 해결됨.
+
+### 이후 코드에 반영된 결정 (Task 6)
+- Codex `get()`: `latest_rollout_snapshot()`(최신 non-null 판독값 + mtime) → `parse_rate_limits(json, plan, Cache, mtime)`. 플랜은 `auth.json` id_token의 `chatgpt_plan_type`(권위) 우선, 없으면 rollout의 `plan_type`.
+- 죽은 라이브 배관(`fetch_live`/`CodexAuth`의 토큰 필드/`CodexError::Http`) 제거로 Task 5 리뷰의 auth 하드의존·죽은 조건식 지적도 해소.
