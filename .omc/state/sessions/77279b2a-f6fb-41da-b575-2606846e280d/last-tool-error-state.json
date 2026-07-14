@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cat node_modules/react-i18next/package.json | grep '\\\"version\\\"'; node -e \\\"\\nconst i18next = require('i18next');\\nconsole.log(typeof i18next.default.changeLanguage);\\n\\\"\"}",
+  "error": "Exit code 1\n  \"version\": \"17.0.9\",\n[eval]:3\nconsole.log(typeof i18next.default.changeLanguage);\n                                   ^\n\nTypeError: Cannot read properties of undefined (reading 'changeLanguage')\n    at [eval]:3:36\n    at runScriptInThisContext (node:internal/vm:219:10)\n    at node:internal/process/execution:451:12\n    at [eval]-wrapper:6:24\n    at runScriptInContext (node:internal/process/execution:449:60)\n    at evalFunction (node:internal/process/execution:283:30)\n    at evalTypeS...",
+  "timestamp": "2026-07-14T02:04:58.627Z",
+  "retry_count": 1
+}
