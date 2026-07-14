@@ -19,6 +19,13 @@
 
 body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
 
+.provider-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.provider-card__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.provider-card__name { font-size: 16px; margin: 0; }
+.provider-card__plan { color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.provider-card__cached { font-size: 11px; color: var(--muted); border: 1px solid var(--border); padding: 1px 6px; border-radius: 999px; }
+.empty-state { color: var(--muted); font-size: 13px; padding: 12px 0; }
+
 .limit-bar { margin: 10px 0; }
 .limit-bar__row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
 .limit-bar__label { font-weight: 500; }
