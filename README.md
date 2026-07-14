@@ -9,6 +9,28 @@ Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데
 
 스택: React + TypeScript + Vite (프런트엔드) / Rust + Tauri v2 (백엔드)
 
+## 다운로드 및 설치
+
+최신 설치 파일은 **[GitHub Releases](https://github.com/donghoon-bigvalue/token-usage-app/releases/latest)** 에서 내려받을 수 있습니다.
+
+| 플랫폼 | 파일 | 설치 방법 |
+| --- | --- | --- |
+| **Windows** | `token-usage-app_<버전>_x64_en-US.msi` 또는 `..._x64-setup.exe` | 내려받아 실행 후 안내를 따릅니다. |
+| **Linux (범용)** | `token-usage-app_<버전>_amd64.AppImage` | 실행 권한을 주고 바로 실행합니다. |
+| **Linux (Debian·Ubuntu)** | `token-usage-app_<버전>_amd64.deb` | `sudo dpkg -i <파일>` 또는 `sudo apt install ./<파일>` |
+| **Linux (Fedora·RHEL)** | `token-usage-app-<버전>-1.x86_64.rpm` | `sudo rpm -i <파일>` 또는 `sudo dnf install ./<파일>` |
+
+### Linux — AppImage 실행
+
+```bash
+chmod +x token-usage-app_*_amd64.AppImage
+./token-usage-app_*_amd64.AppImage
+```
+
+> **Windows 참고** — 코드 서명이 적용돼 있지 않아 첫 실행 시 SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 눌러 진행하세요.
+
+소스에서 직접 빌드하려면 아래 개발자 안내를 참고하세요.
+
 ## 사전 준비 (최초 1회)
 
 ### 1. Node 의존성
