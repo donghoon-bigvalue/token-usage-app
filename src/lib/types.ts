@@ -33,3 +33,30 @@ export interface Settings {
   refresh_interval_secs: number;
   notify_thresholds: number[];
 }
+
+export interface MonthlySummary {
+  year_month: string;
+  provider: "claude" | "codex";
+  total_tokens: number;
+  cost_usd: number | null;
+  cost_estimable: boolean;
+}
+
+export interface MonthlyDetail {
+  year_month: string;
+  provider: "claude" | "codex";
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_write_tokens: number;
+  cache_read_tokens: number;
+  cached_input_tokens: number;
+  total_tokens: number;
+  cost_usd: number | null;
+}
+
+export interface UsageHistory {
+  current_month: string;
+  summaries: MonthlySummary[];
+  details: MonthlyDetail[];
+}
