@@ -13,6 +13,19 @@ pub enum ClaudeError {
     Parse(String),
 }
 
+impl ClaudeError {
+    /// Stable, generic message safe to surface to the frontend. The `Display`
+    /// impl above keeps verbose detail (URLs, parse offsets, response fragments)
+    /// for internal use only — never send it across the IPC boundary.
+    pub fn user_message(&self) -> &'static str {
+        match self {
+            ClaudeError::NoCredentials => "credentials not found",
+            ClaudeError::Http(_) => "request failed",
+            ClaudeError::Parse(_) => "invalid response",
+        }
+    }
+}
+
 pub struct ClaudeCreds {
     pub access_token: String,
     pub subscription_type: String,

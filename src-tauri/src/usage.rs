@@ -35,8 +35,8 @@ pub fn error_snapshot(provider: ProviderId, msg: String) -> UsageSnapshot {
 pub async fn collect() -> UsageReport {
     let (c, x) = tokio::join!(claude::get(), codex::get());
     UsageReport {
-        claude: c.unwrap_or_else(|e| error_snapshot(ProviderId::Claude, e.to_string())),
-        codex: x.unwrap_or_else(|e| error_snapshot(ProviderId::Codex, e.to_string())),
+        claude: c.unwrap_or_else(|e| error_snapshot(ProviderId::Claude, e.user_message().to_string())),
+        codex: x.unwrap_or_else(|e| error_snapshot(ProviderId::Codex, e.user_message().to_string())),
     }
 }
 
