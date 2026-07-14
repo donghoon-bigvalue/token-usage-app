@@ -492,6 +492,16 @@ pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
             if l.kind.as_deref() != Some("assistant") { continue; }
             let (Some(ts), Some(msg)) = (l.timestamp, l.message) else { continue };
             let Some(usage) = msg.usage else { continue };
+            // Claude Code emits synthetic assistant messages (model:"<synthetic>")
+            // with all-zero usage; skip them so they don't create junk zero-token
+            // rows or flip `cost_estimable` to false for an unpriced model.
+            if usage.input_tokens == 0
+                && usage.output_tokens == 0
+                && usage.cache_creation_input_tokens == 0
+                && usage.cache_read_input_tokens == 0
+            {
+                continue;
+            }
             let Some(ym) = year_month_of(&ts) else { continue };
             out.push(UsageRecord {
                 year_month: ym,
@@ -680,5 +690,18 @@ mod tests {
         assert_eq!(r.output_tokens, 20);
         assert_eq!(r.cache_write_tokens, 30);
         assert_eq!(r.cache_read_tokens, 40);
+    }
+
+    #[test]
+    fn scan_usage_skips_synthetic_zero_usage() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pdir = home.join("projects/some-project");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let synthetic = r#"{"type":"assistant","timestamp":"2026-07-08T06:09:03.964Z","message":{"model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        std::fs::write(pdir.join("s.jsonl"), format!("{synthetic}\n")).unwrap();
+
+        let recs = scan_usage(home);
+        assert_eq!(recs.len(), 0);
     }
 }
