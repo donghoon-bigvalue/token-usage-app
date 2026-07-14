@@ -62,7 +62,15 @@ npm run dev        # http://localhost:1420
 npm run tauri build
 ```
 
-실행 파일과 설치 번들이 `src-tauri/target/release/` 아래에 생성됩니다.
+실행 파일과 설치 번들(`.deb`/`.rpm`/AppImage)이 `src-tauri/target/release/bundle/` 아래에 생성됩니다.
+
+> **WSL2 참고 — 번들 단계 `PKG_CONFIG_PATH`**
+> Homebrew의 `pkg-config`가 시스템 것을 가리는 환경에서는, `libayatana-appindicator3-dev`가 설치돼 있어도 번들 단계에서 `Can't detect any appindicator library` 오류가 날 수 있습니다. `src-tauri/.cargo/config.toml`의 `PKG_CONFIG_PATH`는 cargo가 스폰하는 프로세스에만 적용되고 번들링을 수행하는 `tauri-cli`(npm) 프로세스에는 적용되지 않기 때문입니다. 빌드 셸에 직접 지정하세요:
+>
+> ```bash
+> export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:/usr/lib/pkgconfig"
+> npm run tauri build
+> ```
 
 ## 테스트
 
