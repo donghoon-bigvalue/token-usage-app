@@ -74,20 +74,19 @@ jobs:
           if [ -z "$(printf '%s' "$section" | tr -d '[:space:]')" ]; then
             section="이 버전의 변경 사항은 [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)를 참고하세요."
           fi
-          body="${section}
-
----
-
-### ⬇️ 다운로드
-아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요.
-
-- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일
-- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`
-
-**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
           {
             echo "notes<<CHANGELOG_EOF"
-            echo "${body}"
+            echo "${section}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### ⬇️ 다운로드"
+            echo "아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요."
+            echo ""
+            echo "- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일"
+            echo "- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`"
+            echo ""
+            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
