@@ -47,7 +47,6 @@ fn window_label(id: WindowId, lang: &str) -> &'static str {
         WindowId::ClaudeSession => if ko { "현재 세션" } else { "Current session" },
         WindowId::ClaudeWeeklyAll => if ko { "이번 주 (전체 모델)" } else { "Current week (all models)" },
         WindowId::ClaudeWeeklyFable => if ko { "이번 주 (Fable)" } else { "Current week (Fable)" },
-        WindowId::CodexFiveHour => if ko { "현재 5시간" } else { "Current 5-hour" },
         WindowId::CodexWeekly => if ko { "주간 한도" } else { "Weekly limit" },
         WindowId::CodexSparkWeekly => if ko { "Spark 주간 한도" } else { "Spark weekly limit" },
     }

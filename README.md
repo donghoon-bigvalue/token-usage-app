@@ -4,7 +4,7 @@ Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데
 두 서비스의 토큰/사용량 한도와 리셋 시각을 막대 바로 한눈에 보여줍니다.
 
 - **Claude** (강조색 `#D97757`) — 현재 세션, 주간(all models / Fable) 한도와 리셋 시각
-- **Codex** (강조색 `#5162ED`) — 주간 한도, GPT-5.3-Codex-Spark 주간 한도, 5시간 윈도우
+- **Codex** (강조색 `#5162ED`) — 주간 한도, GPT-5.3-Codex-Spark 주간 한도
 - 다크/라이트 모드, 영어·한국어 전환, 한도 임박 알림, 수동·자동 새로고침, 시스템 트레이
 
 스택: React + TypeScript + Vite (프런트엔드) / Rust + Tauri v2 (백엔드)

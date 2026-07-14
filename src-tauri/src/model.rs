@@ -20,7 +20,6 @@ pub enum WindowId {
     ClaudeSession,
     ClaudeWeeklyAll,
     ClaudeWeeklyFable,
-    CodexFiveHour,
     CodexWeekly,
     CodexSparkWeekly,
 }

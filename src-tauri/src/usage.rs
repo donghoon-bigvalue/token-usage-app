@@ -39,7 +39,6 @@ pub fn error_snapshot(provider: ProviderId, msg: String) -> UsageSnapshot {
             LimitWindow::unavailable(WindowId::ClaudeWeeklyFable),
         ],
         ProviderId::Codex => vec![
-            LimitWindow::unavailable(WindowId::CodexFiveHour),
             LimitWindow::unavailable(WindowId::CodexWeekly),
             LimitWindow::unavailable(WindowId::CodexSparkWeekly),
         ],
@@ -108,8 +107,8 @@ mod tests {
         let s = error_snapshot(ProviderId::Codex, "no creds".into());
         assert_eq!(s.provider, ProviderId::Codex);
         assert_eq!(s.error.as_deref(), Some("no creds"));
-        // Codex 자리표시 윈도우 3개(5h, weekly, spark) 모두 unavailable
-        assert_eq!(s.windows.len(), 3);
+        // Codex 자리표시 윈도우 2개(weekly, spark) 모두 unavailable
+        assert_eq!(s.windows.len(), 2);
         assert!(s.windows.iter().all(|w| !w.available));
         assert!(s.windows.iter().any(|w| w.id == WindowId::CodexSparkWeekly));
     }

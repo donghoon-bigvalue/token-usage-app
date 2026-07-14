@@ -1,8 +1,12 @@
 use crate::model::{LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
 use base64::Engine;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use thiserror::Error;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{ChildStdin, ChildStdout, Command};
 
 #[derive(Debug, Error)]
 pub enum CodexError {
@@ -12,6 +16,8 @@ pub enum CodexError {
     NoRollout,
     #[error("parse error: {0}")]
     Parse(String),
+    #[error("app-server error: {0}")]
+    AppServer(String),
 }
 
 impl CodexError {
@@ -23,6 +29,7 @@ impl CodexError {
             CodexError::NoCredentials => "credentials not found",
             CodexError::NoRollout => "no usage data",
             CodexError::Parse(_) => "invalid data",
+            CodexError::AppServer(_) => "no usage data",
         }
     }
 }
@@ -39,6 +46,7 @@ struct RateLimits {
 struct Bucket {
     #[serde(default)]
     used_percent: f64,
+    window_minutes: Option<i64>,
     resets_at: Option<i64>,
 }
 
@@ -52,6 +60,42 @@ struct Tokens {
     id_token: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct AppServerResult {
+    #[serde(rename = "rateLimits")]
+    rate_limits: Option<AppServerRateLimits>,
+    #[serde(rename = "rateLimitsByLimitId", default)]
+    by_limit_id: HashMap<String, AppServerLimit>,
+}
+
+#[derive(Deserialize)]
+struct AppServerRateLimits {
+    primary: Option<AppServerBucket>,
+    secondary: Option<AppServerBucket>,
+    #[serde(rename = "planType")]
+    plan_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AppServerBucket {
+    #[serde(rename = "usedPercent")]
+    used_percent: Option<f64>,
+    #[serde(rename = "windowDurationMins")]
+    window_duration_mins: Option<i64>,
+    #[serde(rename = "resetsAt")]
+    resets_at: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct AppServerLimit {
+    #[serde(rename = "limitId")]
+    limit_id: Option<String>,
+    #[serde(rename = "limitName")]
+    limit_name: Option<String>,
+    primary: Option<AppServerBucket>,
+    secondary: Option<AppServerBucket>,
+}
+
 pub fn plan_label(plan_raw: &str) -> String {
     match plan_raw {
         "pro" => "Pro".into(),
@@ -63,16 +107,50 @@ pub fn plan_label(plan_raw: &str) -> String {
         other if other.is_empty() => "Unknown".into(),
         other => {
             let mut c = other.chars();
-            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
         }
     }
 }
 
-fn window_from(bucket: &Option<Bucket>, id: WindowId) -> LimitWindow {
+fn window_from(bucket: Option<&Bucket>, id: WindowId) -> LimitWindow {
     match bucket {
-        Some(b) => LimitWindow { id, used_percent: b.used_percent, resets_at: b.resets_at, available: true },
+        Some(b) => LimitWindow {
+            id,
+            used_percent: b.used_percent,
+            resets_at: b.resets_at,
+            available: true,
+        },
         None => LimitWindow::unavailable(id),
     }
+}
+
+fn weekly_rollout_bucket(rate_limits: &RateLimits) -> Option<&Bucket> {
+    let candidates = [rate_limits.primary.as_ref(), rate_limits.secondary.as_ref()];
+    if let Some(bucket) = candidates
+        .into_iter()
+        .flatten()
+        .find(|bucket| bucket.window_minutes == Some(10080))
+    {
+        return Some(bucket);
+    }
+
+    // Older rollout entries did not include window_minutes and used
+    // secondary for the weekly window.
+    let has_duration = rate_limits
+        .primary
+        .as_ref()
+        .or(rate_limits.secondary.as_ref())
+        .and_then(|bucket| bucket.window_minutes)
+        .is_some();
+    if !has_duration {
+        return rate_limits
+            .secondary
+            .as_ref()
+            .or(rate_limits.primary.as_ref());
+    }
+    None
 }
 
 pub fn parse_rate_limits(
@@ -81,16 +159,16 @@ pub fn parse_rate_limits(
     source: Source,
     updated_at: i64,
 ) -> Result<UsageSnapshot, CodexError> {
-    let rl: RateLimits = serde_json::from_str(json).map_err(|e| CodexError::Parse(e.to_string()))?;
+    let rl: RateLimits =
+        serde_json::from_str(json).map_err(|e| CodexError::Parse(e.to_string()))?;
     let effective_plan = if plan_raw.is_empty() {
         rl.plan_type.clone().unwrap_or_default()
     } else {
         plan_raw.to_string()
     };
     let windows = vec![
-        window_from(&rl.primary, WindowId::CodexFiveHour),
-        window_from(&rl.secondary, WindowId::CodexWeekly),
-        // Spark: rate_limits 스냅샷엔 없음 → 라이브 경로(Task 5)에서 채우거나 unavailable
+        window_from(weekly_rollout_bucket(&rl), WindowId::CodexWeekly),
+        // Spark: rollout rate_limits에는 없음.
         LimitWindow::unavailable(WindowId::CodexSparkWeekly),
     ];
     Ok(UsageSnapshot {
@@ -104,9 +182,115 @@ pub fn parse_rate_limits(
     })
 }
 
+fn app_server_window(bucket: Option<&AppServerBucket>, id: WindowId) -> LimitWindow {
+    match bucket.and_then(|b| b.used_percent) {
+        Some(used_percent) => LimitWindow {
+            id,
+            used_percent,
+            resets_at: bucket.and_then(|b| b.resets_at),
+            available: true,
+        },
+        None => LimitWindow::unavailable(id),
+    }
+}
+
+fn app_server_bucket_for_duration<'a>(
+    primary: Option<&'a AppServerBucket>,
+    secondary: Option<&'a AppServerBucket>,
+    duration_mins: i64,
+) -> Option<&'a AppServerBucket> {
+    let buckets = [primary, secondary];
+    if let Some(bucket) = buckets
+        .into_iter()
+        .flatten()
+        .find(|bucket| bucket.window_duration_mins == Some(duration_mins))
+    {
+        return Some(bucket);
+    }
+
+    // Very old app-server responses may omit windowDurationMins. Preserve the
+    // original primary/secondary convention only for those responses.
+    let has_duration = primary
+        .or(secondary)
+        .and_then(|bucket| bucket.window_duration_mins)
+        .is_some();
+    if !has_duration {
+        return match duration_mins {
+            300 => primary,
+            10080 => secondary,
+            _ => None,
+        };
+    }
+    None
+}
+
+fn app_server_spark_bucket(
+    by_limit_id: &HashMap<String, AppServerLimit>,
+) -> Option<&AppServerBucket> {
+    by_limit_id
+        .values()
+        .find(|limit| {
+            limit.limit_name.as_deref() == Some("GPT-5.3-Codex-Spark")
+                || limit
+                    .limit_id
+                    .as_deref()
+                    .is_some_and(|id| id.contains("bengalfox"))
+        })
+        .and_then(|limit| {
+            app_server_bucket_for_duration(limit.primary.as_ref(), limit.secondary.as_ref(), 10080)
+                .or(limit.primary.as_ref())
+                .or(limit.secondary.as_ref())
+        })
+}
+
+/// Convert the app-server's camelCase rate-limit response to the common model.
+/// The app-server is the live source; Spark is read from its per-limit map
+/// when the current Codex build exposes that entry.
+pub fn parse_app_server_rate_limits(
+    result: serde_json::Value,
+    plan_raw: &str,
+    updated_at: i64,
+) -> Result<UsageSnapshot, CodexError> {
+    let result: AppServerResult =
+        serde_json::from_value(result).map_err(|e| CodexError::Parse(e.to_string()))?;
+    let by_limit_id = result.by_limit_id;
+    let limits = result
+        .rate_limits
+        .ok_or_else(|| CodexError::Parse("missing rate limits".into()))?;
+    let effective_plan = if plan_raw.is_empty() {
+        limits.plan_type.as_deref().unwrap_or_default()
+    } else {
+        plan_raw
+    };
+    Ok(UsageSnapshot {
+        provider: ProviderId::Codex,
+        plan: plan_label(effective_plan),
+        plan_raw: effective_plan.to_string(),
+        source: Source::Live,
+        updated_at,
+        windows: vec![
+            app_server_window(
+                app_server_bucket_for_duration(
+                    limits.primary.as_ref(),
+                    limits.secondary.as_ref(),
+                    10080,
+                ),
+                WindowId::CodexWeekly,
+            ),
+            app_server_window(
+                app_server_spark_bucket(&by_limit_id),
+                WindowId::CodexSparkWeekly,
+            ),
+        ],
+        error: None,
+    })
+}
+
 pub fn plan_from_id_token(id_token: &str) -> Option<String> {
     let payload = id_token.split('.').nth(1)?;
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload).ok()?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
     let v: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
     v.get("https://api.openai.com/auth")?
         .get("chatgpt_plan_type")?
@@ -221,6 +405,117 @@ pub fn latest_rollout_snapshot(codex_home: &Path) -> Result<(String, i64), Codex
     Ok((json, *mtime))
 }
 
+fn codex_home() -> Result<PathBuf, CodexError> {
+    std::env::var_os("CODEX_HOME")
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
+        .ok_or(CodexError::NoCredentials)
+}
+
+async fn write_json_line(
+    writer: &mut ChildStdin,
+    value: serde_json::Value,
+) -> Result<(), CodexError> {
+    let mut line = serde_json::to_vec(&value).map_err(|e| CodexError::AppServer(e.to_string()))?;
+    line.push(b'\n');
+    writer
+        .write_all(&line)
+        .await
+        .map_err(|e| CodexError::AppServer(e.to_string()))?;
+    writer
+        .flush()
+        .await
+        .map_err(|e| CodexError::AppServer(e.to_string()))
+}
+
+async fn read_response(
+    reader: &mut BufReader<ChildStdout>,
+    expected_id: u64,
+) -> Result<serde_json::Value, CodexError> {
+    loop {
+        let mut line = String::new();
+        let read = reader
+            .read_line(&mut line)
+            .await
+            .map_err(|e| CodexError::AppServer(e.to_string()))?;
+        if read == 0 {
+            return Err(CodexError::AppServer(
+                "app-server exited unexpectedly".into(),
+            ));
+        }
+
+        let message: serde_json::Value =
+            serde_json::from_str(&line).map_err(|e| CodexError::AppServer(e.to_string()))?;
+        if message.get("id").and_then(serde_json::Value::as_u64) != Some(expected_id) {
+            // Notifications can arrive between request and response. They are
+            // irrelevant for this one-shot account query.
+            continue;
+        }
+        if let Some(error) = message.get("error") {
+            return Err(CodexError::AppServer(error.to_string()));
+        }
+        return message
+            .get("result")
+            .cloned()
+            .ok_or_else(|| CodexError::AppServer("response has no result".into()));
+    }
+}
+
+/// Ask the installed Codex CLI for the same rate-limit data shown by its
+/// status bar. This avoids calling the undocumented ChatGPT backend endpoint
+/// directly and keeps authentication inside the official Codex process.
+async fn fetch_app_server() -> Result<serde_json::Value, CodexError> {
+    let mut child = Command::new("codex")
+        .args(["app-server", "--stdio"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| CodexError::AppServer(e.to_string()))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| CodexError::AppServer("app-server stdin unavailable".into()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| CodexError::AppServer("app-server stdout unavailable".into()))?;
+    let mut reader = BufReader::new(stdout);
+
+    write_json_line(
+        &mut stdin,
+        serde_json::json!({
+            "method": "initialize",
+            "id": 1,
+            "params": {
+                "clientInfo": {
+                    "name": "token_usage_app",
+                    "title": "Token Usage App",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            }
+        }),
+    )
+    .await?;
+    read_response(&mut reader, 1).await?;
+
+    write_json_line(
+        &mut stdin,
+        serde_json::json!({ "method": "initialized", "params": {} }),
+    )
+    .await?;
+    write_json_line(
+        &mut stdin,
+        serde_json::json!({ "method": "account/rateLimits/read", "id": 2, "params": {} }),
+    )
+    .await?;
+    let result = read_response(&mut reader, 2).await;
+    let _ = child.kill().await;
+    result
+}
+
 fn extract_balanced_object(s: &str) -> Option<&str> {
     let bytes = s.as_bytes();
     let mut depth = 0usize;
@@ -228,9 +523,13 @@ fn extract_balanced_object(s: &str) -> Option<&str> {
     let mut esc = false;
     for (i, &b) in bytes.iter().enumerate() {
         if in_str {
-            if esc { esc = false; }
-            else if b == b'\\' { esc = true; }
-            else if b == b'"' { in_str = false; }
+            if esc {
+                esc = false;
+            } else if b == b'\\' {
+                esc = true;
+            } else if b == b'"' {
+                in_str = false;
+            }
             continue;
         }
         match b {
@@ -238,7 +537,9 @@ fn extract_balanced_object(s: &str) -> Option<&str> {
             b'{' => depth += 1,
             b'}' => {
                 depth -= 1;
-                if depth == 0 { return Some(&s[..=i]); }
+                if depth == 0 {
+                    return Some(&s[..=i]);
+                }
             }
             _ => {}
         }
@@ -248,23 +549,30 @@ fn extract_balanced_object(s: &str) -> Option<&str> {
 
 /// Codex usage snapshot.
 ///
-/// Codex exposes rate limits ONLY inside the `/responses` stream, which the CLI
-/// persists to session rollouts — there is no standalone usage endpoint we can
-/// call: `GET /backend-api/codex/usage` returns a Cloudflare managed challenge
-/// (HTTP 403) via both curl and reqwest without a browser session (verified in
-/// the Task 6 spike). So the newest rollout snapshot IS our source. This is the
-/// same freshness the Codex CLI status line shows, since it too only learns its
-/// limits from its most recent API turn.
-///
-/// The Spark weekly limit is not present anywhere in local rollout data and is
-/// unreachable without the (blocked) live endpoint, so it stays `unavailable`
-/// (best-effort, per spec §9-2).
+/// Prefer the official app-server `account/rateLimits/read` method, which is
+/// the same source used by Codex rich clients. Older CLI versions may not have
+/// that method (or Codex may not be installed on PATH), so rollout snapshots
+/// remain a useful local fallback. Spark is available when the app-server
+/// exposes its per-limit entry; rollout data still cannot provide it.
 pub async fn get() -> Result<UsageSnapshot, CodexError> {
-    let home = dirs::home_dir().ok_or(CodexError::NoCredentials)?.join(".codex");
-    let (json, updated_at) = latest_rollout_snapshot(&home)?;
-    // Authoritative plan from the id_token when auth.json is present; otherwise
-    // parse_rate_limits falls back to the plan_type embedded in the rollout.
+    let home = codex_home()?;
     let plan_type = read_plan_type(&home).unwrap_or_default();
+
+    if let Ok(result) =
+        tokio::time::timeout(std::time::Duration::from_secs(15), fetch_app_server()).await
+    {
+        if let Ok(result) = result {
+            if let Ok(snapshot) =
+                parse_app_server_rate_limits(result, &plan_type, chrono::Utc::now().timestamp())
+            {
+                return Ok(snapshot);
+            }
+        }
+    }
+
+    let (json, updated_at) = latest_rollout_snapshot(&home)?;
+    // If auth.json is absent, parse_rate_limits falls back to plan_type in the
+    // rollout event.
     parse_rate_limits(&json, &plan_type, Source::Cache, updated_at)
 }
 
@@ -279,22 +587,83 @@ mod tests {
     #[test]
     fn parses_primary_and_secondary() {
         let s = parse_rate_limits(FILLED, "pro", Source::Cache, 5).unwrap();
-        let five = s.windows.iter().find(|w| w.id == WindowId::CodexFiveHour).unwrap();
-        assert_eq!(five.used_percent, 73.0);
-        assert_eq!(five.resets_at, Some(1783661689));
-        let week = s.windows.iter().find(|w| w.id == WindowId::CodexWeekly).unwrap();
+        let week = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexWeekly)
+            .unwrap();
         assert_eq!(week.used_percent, 11.0);
-        let spark = s.windows.iter().find(|w| w.id == WindowId::CodexSparkWeekly).unwrap();
+        let spark = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexSparkWeekly)
+            .unwrap();
         assert!(!spark.available);
         assert_eq!(s.source, Source::Cache);
     }
 
     #[test]
+    fn parses_app_server_rate_limits() {
+        let result = serde_json::json!({
+            "rateLimits": {
+                "primary": {
+                    "usedPercent": 25.0,
+                    "windowDurationMins": 300,
+                    "resetsAt": 1783661689
+                },
+                "secondary": {
+                    "usedPercent": 11.0,
+                    "windowDurationMins": 10080,
+                    "resetsAt": 1784248489
+                }
+            },
+            "rateLimitsByLimitId": {
+                "codex_bengalfox": {
+                    "limitId": "codex_bengalfox",
+                    "limitName": "GPT-5.3-Codex-Spark",
+                    "primary": {
+                        "usedPercent": 4.0,
+                        "windowDurationMins": 10080,
+                        "resetsAt": 1784248489
+                    },
+                    "secondary": null
+                }
+            }
+        });
+        let s = parse_app_server_rate_limits(result, "pro", 10).unwrap();
+        let week = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexWeekly)
+            .unwrap();
+        assert_eq!(week.used_percent, 11.0);
+        let spark = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexSparkWeekly)
+            .unwrap();
+        assert_eq!(spark.used_percent, 4.0);
+        assert_eq!(spark.resets_at, Some(1784248489));
+        assert_eq!(s.source, Source::Live);
+    }
+
+    #[test]
+    fn app_server_null_windows_are_unavailable() {
+        let result = serde_json::json!({
+            "rateLimits": { "primary": null, "secondary": null }
+        });
+        let s = parse_app_server_rate_limits(result, "plus", 10).unwrap();
+        assert!(s.windows.iter().all(|window| !window.available));
+    }
+
+    #[test]
     fn null_windows_are_unavailable() {
         let s = parse_rate_limits(NULLED, "pro", Source::Cache, 0).unwrap();
-        let five = s.windows.iter().find(|w| w.id == WindowId::CodexFiveHour).unwrap();
-        assert!(!five.available);
-        let week = s.windows.iter().find(|w| w.id == WindowId::CodexWeekly).unwrap();
+        let week = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexWeekly)
+            .unwrap();
         assert!(!week.available);
     }
 
@@ -313,18 +682,23 @@ mod tests {
         let content = include_str!("../../tests/fixtures/rollout_sample.jsonl");
         std::fs::write(sdir.join("rollout-2026-07-14T09-00-00-abc.jsonl"), content).unwrap();
         let (rl, _mtime) = latest_rollout_snapshot(&dir).unwrap();
-        // 마지막(최신) 스냅샷: primary 73.0
+        // 마지막(최신) 스냅샷의 주간 한도: 11.0
         assert!(rl.contains("73"));
         let s = parse_rate_limits(&rl, "", Source::Cache, 0).unwrap();
-        let five = s.windows.iter().find(|w| w.id == WindowId::CodexFiveHour).unwrap();
-        assert_eq!(five.used_percent, 73.0);
+        let week = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexWeekly)
+            .unwrap();
+        assert_eq!(week.used_percent, 11.0);
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn decodes_plan_type_from_id_token() {
         // payload: {"https://api.openai.com/auth":{"chatgpt_plan_type":"pro"}}
-        let payload = "eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9wbGFuX3R5cGUiOiJwcm8ifX0";
+        let payload =
+            "eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9wbGFuX3R5cGUiOiJwcm8ifX0";
         let jwt = format!("aaa.{}.bbb", payload);
         assert_eq!(plan_from_id_token(&jwt), Some("pro".to_string()));
     }
@@ -334,8 +708,11 @@ mod tests {
     async fn codex_smoke() {
         // Manual: reads real ~/.codex rollouts. Run: cargo test codex_smoke -- --ignored --nocapture
         let s = super::get().await.unwrap();
-        assert_eq!(s.windows.len(), 3);
-        println!("plan={} source={:?} updated_at={} windows={:?}", s.plan, s.source, s.updated_at, s.windows);
+        assert_eq!(s.windows.len(), 2);
+        println!(
+            "plan={} source={:?} updated_at={} windows={:?}",
+            s.plan, s.source, s.updated_at, s.windows
+        );
     }
 
     #[test]
@@ -354,9 +731,13 @@ mod tests {
         std::fs::write(sdir.join("rollout-2026-07-14T09-00-00-abc.jsonl"), content).unwrap();
         let (json, _mtime) = latest_rollout_snapshot(&dir).unwrap();
         let s = parse_rate_limits(&json, "pro", Source::Cache, 0).unwrap();
-        let five = s.windows.iter().find(|w| w.id == WindowId::CodexFiveHour).unwrap();
-        assert!(five.available);
-        assert_eq!(five.used_percent, 50.0);
+        let week = s
+            .windows
+            .iter()
+            .find(|w| w.id == WindowId::CodexWeekly)
+            .unwrap();
+        assert!(week.available);
+        assert_eq!(week.used_percent, 9.0);
         std::fs::remove_dir_all(&dir).ok();
     }
 

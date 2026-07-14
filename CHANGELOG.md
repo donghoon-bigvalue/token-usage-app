@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-14
+
+Codex 사용량 조회 개선 릴리스입니다.
+
+### Added
+- Codex app-server를 통한 실시간 주간·Spark 주간 한도 조회
+- app-server를 사용할 수 없는 환경을 위한 rollout 데이터 fallback
+
+### Changed
+- Codex 카드에서 제공되지 않는 5시간 한도 표시 제거
+- Codex CLI 응답의 계정별 quota window 구조를 기준으로 한도 매핑
+
 ## [0.1.1] - 2026-07-14
 
 배포·문서 개선 릴리스입니다.
@@ -44,6 +56,7 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/donghoon-bigvalue/token-usage-app/releases/tag/v0.1.0

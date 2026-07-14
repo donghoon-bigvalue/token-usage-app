@@ -5,7 +5,6 @@
     "claude_session": "현재 세션",
     "claude_weekly_all": "이번 주 (전체 모델)",
     "claude_weekly_fable": "이번 주 (Fable)",
-    "codex_five_hour": "현재 5시간",
     "codex_weekly": "주간 한도",
     "codex_spark_weekly": "Spark 주간 한도"
   },

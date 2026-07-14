@@ -5,7 +5,6 @@
     "claude_session": "Current session",
     "claude_weekly_all": "Current week (all models)",
     "claude_weekly_fable": "Current week (Fable)",
-    "codex_five_hour": "Current 5-hour",
     "codex_weekly": "Weekly limit",
     "codex_spark_weekly": "Spark weekly limit"
   },
