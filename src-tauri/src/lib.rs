@@ -4,6 +4,7 @@ mod providers;
 mod settings;
 mod usage;
 mod commands;
+mod history;
 mod poller;
 
 use tauri::tray::TrayIconBuilder;
