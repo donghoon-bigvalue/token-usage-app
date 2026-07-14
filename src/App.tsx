@@ -1,51 +1,67 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { fetchUsage, onUsageUpdated } from "./lib/usage";
+import { getSettings, setSettings } from "./lib/settings";
+import { applyTheme } from "./theme";
+import type { UsageReport, Settings } from "./lib/types";
+import { Header } from "./components/Header";
+import { ProviderCard } from "./components/ProviderCard";
+import { SettingsPanel } from "./components/SettingsPanel";
+import "./styles/theme.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+export default function App() {
+  const { i18n } = useTranslation();
+  const [report, setReport] = useState<UsageReport | null>(null);
+  const [settings, setSettingsState] = useState<Settings | null>(null);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  const [showSettings, setShowSettings] = useState(false);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  // 초기 로드
+  useEffect(() => {
+    getSettings().then((s) => {
+      setSettingsState(s);
+      applyTheme(s.theme);
+      i18n.changeLanguage(s.language);
+    });
+    fetchUsage().then(setReport);
+    const un = onUsageUpdated(setReport);
+    return () => { un.then((f) => f()); };
+  }, [i18n]);
+
+  // 카운트다운 틱
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const refresh = useCallback(() => { fetchUsage().then(setReport); }, []);
+
+  const changeSettings = useCallback((next: Settings) => {
+    setSettingsState(next);
+    applyTheme(next.theme);
+    i18n.changeLanguage(next.language);
+    setSettings(next).then(setSettingsState);
+  }, [i18n]);
+
+  const locale = (settings?.language ?? "en") as "en" | "ko";
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+    <main className="app">
+      <Header
+        onRefresh={refresh}
+        onOpenSettings={() => setShowSettings((v) => !v)}
+        updatedAt={report?.claude.updated_at ?? null}
+        locale={locale}
+      />
+      {showSettings && settings && (
+        <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />
+      )}
+      {report && (
+        <div className="app__cards">
+          <ProviderCard snapshot={report.claude} now={now} locale={locale} />
+          <ProviderCard snapshot={report.codex} now={now} locale={locale} />
+        </div>
+      )}
     </main>
   );
 }
-
-export default App;

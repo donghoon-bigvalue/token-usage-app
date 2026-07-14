@@ -35,3 +35,13 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .limit-bar__fill { height: 100%; border-radius: 999px; transition: width .3s ease; }
 .limit-bar__reset { font-size: 11px; color: var(--muted); margin-top: 3px; }
 .limit-bar--unavailable { opacity: .5; }
+
+.app { max-width: 520px; margin: 0 auto; padding: 16px; }
+.app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.app-header__title { font-size: 18px; margin: 0; }
+.app-header__actions { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.app-header__updated { color: var(--muted); }
+.app__cards { display: flex; flex-direction: column; gap: 14px; }
+.settings-panel { display: flex; flex-wrap: wrap; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+.settings-panel label { display: flex; flex-direction: column; font-size: 12px; gap: 4px; color: var(--muted); }
+button { cursor: pointer; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
