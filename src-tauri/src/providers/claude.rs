@@ -1,5 +1,6 @@
 use crate::model::{iso8601_to_epoch, LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
 use serde::Deserialize;
+use std::path::Path;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -10,6 +11,28 @@ pub enum ClaudeError {
     Http(String),
     #[error("parse error: {0}")]
     Parse(String),
+}
+
+pub struct ClaudeCreds {
+    pub access_token: String,
+    pub subscription_type: String,
+    pub rate_limit_tier: String,
+}
+
+#[derive(Deserialize)]
+struct CredFile {
+    #[serde(rename = "claudeAiOauth")]
+    oauth: Option<OauthBlock>,
+}
+
+#[derive(Deserialize)]
+struct OauthBlock {
+    #[serde(rename = "accessToken")]
+    access_token: String,
+    #[serde(rename = "subscriptionType")]
+    subscription_type: Option<String>,
+    #[serde(rename = "rateLimitTier")]
+    rate_limit_tier: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -44,6 +67,41 @@ struct Scope {
 #[derive(Deserialize)]
 struct ScopeModel {
     display_name: Option<String>,
+}
+
+pub fn read_credentials(claude_home: &Path) -> Result<ClaudeCreds, ClaudeError> {
+    let path = claude_home.join(".credentials.json");
+    let txt = std::fs::read_to_string(&path).map_err(|_| ClaudeError::NoCredentials)?;
+    let f: CredFile = serde_json::from_str(&txt).map_err(|e| ClaudeError::Parse(e.to_string()))?;
+    let o = f.oauth.ok_or(ClaudeError::NoCredentials)?;
+    Ok(ClaudeCreds {
+        access_token: o.access_token,
+        subscription_type: o.subscription_type.unwrap_or_else(|| "unknown".into()),
+        rate_limit_tier: o.rate_limit_tier.unwrap_or_default(),
+    })
+}
+
+pub async fn fetch(creds: &ClaudeCreds) -> Result<UsageSnapshot, ClaudeError> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("https://api.anthropic.com/api/oauth/usage")
+        .header("Authorization", format!("Bearer {}", creds.access_token))
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .send()
+        .await
+        .map_err(|e| ClaudeError::Http(e.to_string()))?;
+    if !resp.status().is_success() {
+        return Err(ClaudeError::Http(format!("status {}", resp.status())));
+    }
+    let body = resp.text().await.map_err(|e| ClaudeError::Http(e.to_string()))?;
+    let now = chrono::Utc::now().timestamp();
+    parse_usage(&body, &creds.subscription_type, &creds.rate_limit_tier, now)
+}
+
+pub async fn get() -> Result<UsageSnapshot, ClaudeError> {
+    let home = dirs::home_dir().ok_or(ClaudeError::NoCredentials)?.join(".claude");
+    let creds = read_credentials(&home)?;
+    fetch(&creds).await
 }
 
 pub fn plan_label(subscription_type: &str, rate_limit_tier: &str) -> String {
@@ -185,5 +243,33 @@ mod tests {
         assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeSession));
         assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeWeeklyAll));
         assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeWeeklyFable));
+    }
+
+    #[test]
+    fn reads_credentials_from_file() {
+        let dir = std::env::temp_dir().join(format!("claude-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(".credentials.json"),
+            r#"{"claudeAiOauth":{"accessToken":"tok123","subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}"#,
+        ).unwrap();
+        let creds = read_credentials(&dir).unwrap();
+        assert_eq!(creds.access_token, "tok123");
+        assert_eq!(creds.subscription_type, "max");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn missing_credentials_errors() {
+        let dir = std::env::temp_dir().join("claude-nonexistent-xyz");
+        assert!(matches!(read_credentials(&dir), Err(ClaudeError::NoCredentials)));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn claude_live_smoke() {
+        let s = super::get().await.unwrap();
+        assert_eq!(s.windows.len(), 3);
+        println!("plan={} windows={:?}", s.plan, s.windows);
     }
 }
