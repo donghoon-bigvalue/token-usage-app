@@ -58,6 +58,39 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # CHANGELOG.md에서 "## [<version>]" 헤딩 아래 내용을
+          # 다음 버전 헤딩 또는 링크 참조 정의 직전까지 추출한다.
+          section="$(awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { cap=1; next }
+            cap && /^## \[/ { exit }
+            cap && /^\[[^]]+\]: / { exit }
+            cap { print }
+          ' CHANGELOG.md)"
+          if [ -z "$(printf '%s' "$section" | tr -d '[:space:]')" ]; then
+            section="이 버전의 변경 사항은 [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)를 참고하세요."
+          fi
+          body="${section}
+
+---
+
+### ⬇️ 다운로드
+아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요.
+
+- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일
+- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`
+
+**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
+          {
+            echo "notes<<CHANGELOG_EOF"
+            echo "${body}"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and release Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -65,13 +98,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'token-usage-app v__VERSION__'
-          releaseBody: |
-            ## token-usage-app v__VERSION__
-
-            아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요.
-
-            - **Windows**: `.msi` 또는 `.exe`(NSIS) 설치 파일
-            - **Linux**: `.AppImage`, `.deb`, `.rpm`
+          releaseBody: ${{ steps.changelog.outputs.notes }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
