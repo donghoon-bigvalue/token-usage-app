@@ -1,0 +1,78 @@
+name: Release
+
+# v* 태그(예: v0.1.0)를 push하면 Windows·Linux 설치 파일을 빌드해
+# GitHub Release(Draft)에 Assets로 업로드합니다.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+          - platform: 'ubuntu-22.04'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            patchelf \
+            build-essential \
+            file \
+            wget \
+            curl
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and release Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'token-usage-app v__VERSION__'
+          releaseBody: |
+            ## token-usage-app v__VERSION__
+
+            아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요.
+
+            - **Windows**: `.msi` 또는 `.exe`(NSIS) 설치 파일
+            - **Linux**: `.AppImage`, `.deb`, `.rpm`
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
