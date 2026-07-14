@@ -1,5 +1,6 @@
 mod model;
 mod providers;
+mod settings;
 mod usage;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
