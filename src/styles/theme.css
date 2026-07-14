@@ -5,6 +5,8 @@
   --muted: #6b6b6b;
   --track: #e6e6e6;
   --border: #e0e0e0;
+  /* Render native controls (select popup, spinner) light. */
+  color-scheme: light;
 }
 [data-theme="dark"] {
   --bg: #1b1b1d;
@@ -13,6 +15,8 @@
   --muted: #a0a0a0;
   --track: #3a3a3d;
   --border: #38383b;
+  /* Without this the native <select> popup stays white → white-on-white text. */
+  color-scheme: dark;
 }
 .provider-claude { --accent: #D97757; }
 .provider-codex  { --accent: #5162ED; }
@@ -56,6 +60,11 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+/* Fallback for renderers that don't fully honor color-scheme on the popup. */
+.settings-panel select option {
+  color: var(--text);
+  background: var(--card);
 }
 /* Close button: square, pinned to the far right of the panel (issue #7-2). */
 .settings-panel__close {
