@@ -1,0 +1,13 @@
+{
+  "app": { "title": "토큰 사용량", "refresh": "새로고침", "settings": "설정", "lastUpdated": "{{time}} 갱신", "cached": "캐시됨" },
+  "provider": { "claude": "Claude", "codex": "Codex", "plan": "플랜", "connect": "{{name}} CLI로 로그인하면 사용량이 보여요", "unavailable": "데이터 없음" },
+  "window": {
+    "claude_session": "현재 세션",
+    "claude_weekly_all": "이번 주 (전체 모델)",
+    "claude_weekly_fable": "이번 주 (Fable)",
+    "codex_five_hour": "현재 5시간",
+    "codex_weekly": "주간 한도",
+    "codex_spark_weekly": "Spark 주간 한도"
+  },
+  "settings": { "language": "언어", "theme": "테마", "light": "라이트", "dark": "다크", "system": "시스템", "interval": "자동 새로고침 (초)", "thresholds": "알림 임계치 (%)" }
+}
