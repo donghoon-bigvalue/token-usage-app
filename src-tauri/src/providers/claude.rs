@@ -108,23 +108,25 @@ pub fn parse_usage(
 
     // 2차: top-level 폴백
     if !have_session {
-        if let Some(w) = &raw.five_hour {
-            windows.push(LimitWindow {
+        match &raw.five_hour {
+            Some(w) => windows.push(LimitWindow {
                 id: WindowId::ClaudeSession,
                 used_percent: w.utilization.unwrap_or(0.0),
                 resets_at: w.resets_at.as_deref().and_then(iso8601_to_epoch),
                 available: true,
-            });
+            }),
+            None => windows.push(LimitWindow::unavailable(WindowId::ClaudeSession)),
         }
     }
     if !have_weekly_all {
-        if let Some(w) = &raw.seven_day {
-            windows.push(LimitWindow {
+        match &raw.seven_day {
+            Some(w) => windows.push(LimitWindow {
                 id: WindowId::ClaudeWeeklyAll,
                 used_percent: w.utilization.unwrap_or(0.0),
                 resets_at: w.resets_at.as_deref().and_then(iso8601_to_epoch),
                 available: true,
-            });
+            }),
+            None => windows.push(LimitWindow::unavailable(WindowId::ClaudeWeeklyAll)),
         }
     }
     if !have_fable {
@@ -173,5 +175,15 @@ mod tests {
         // session + weekly_all 최소 2개, fable은 unavailable
         let fable = s.windows.iter().find(|w| w.id == WindowId::ClaudeWeeklyFable).unwrap();
         assert!(!fable.available);
+    }
+
+    #[test]
+    fn empty_body_yields_three_unavailable_windows() {
+        let s = parse_usage("{}", "max", "default_claude_max_20x", 0).unwrap();
+        assert_eq!(s.windows.len(), 3);
+        assert!(s.windows.iter().all(|w| !w.available));
+        assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeSession));
+        assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeWeeklyAll));
+        assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeWeeklyFable));
     }
 }
