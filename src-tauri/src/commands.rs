@@ -1,3 +1,4 @@
+use crate::model::UsageHistory;
 use crate::settings::{sanitize, Settings};
 use crate::usage::{self, UsageReport};
 use tauri::AppHandle;
@@ -36,4 +37,16 @@ pub fn set_settings(app: AppHandle, settings: Settings) -> Settings {
         }
     }
     clean
+}
+
+#[tauri::command]
+pub fn get_usage_history() -> UsageHistory {
+    crate::history::build_history()
+}
+
+#[tauri::command]
+pub fn export_usage_csv(path: String) -> Result<(), String> {
+    let history = crate::history::build_history();
+    let csv = crate::history::to_csv(&history);
+    std::fs::write(&path, csv).map_err(|e| e.to_string())
 }

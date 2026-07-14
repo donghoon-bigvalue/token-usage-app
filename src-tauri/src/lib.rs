@@ -15,10 +15,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_usage,
             commands::get_settings,
             commands::set_settings,
+            commands::get_usage_history,
+            commands::export_usage_csv,
         ])
         .setup(|app| {
             poller::start(app.handle().clone());
