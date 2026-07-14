@@ -1,4 +1,5 @@
 mod model;
+mod pricing;
 mod providers;
 mod settings;
 mod usage;
