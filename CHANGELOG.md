@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-14
+
+배포·문서 개선 릴리스입니다.
+
+### Added
+- README에 다운로드 링크와 플랫폼별 설치 방법 안내 추가
+- `CHANGELOG.md` 도입 (Keep a Changelog 형식)
+- 릴리스 노트에 `CHANGELOG.md`의 해당 버전 섹션을 자동 반영하는 워크플로 연결
+
+### Fixed
+- 릴리스 워크플로의 Linux 빌드 의존성 apt 충돌 해결 및 Node 22로 상향
+
 ## [0.1.0] - 2026-07-14
 
 Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 MVP 릴리스입니다.
@@ -32,5 +44,6 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/donghoon-bigvalue/token-usage-app/releases/tag/v0.1.0
