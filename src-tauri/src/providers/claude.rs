@@ -1,6 +1,6 @@
-use crate::model::{iso8601_to_epoch, LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
+use crate::model::{iso8601_to_epoch, year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId};
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -439,6 +439,75 @@ pub fn parse_usage(
     })
 }
 
+// ---- Historical usage scan (issue #19) ----
+
+#[derive(Deserialize)]
+struct ScanLine {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    timestamp: Option<String>,
+    message: Option<ScanMessage>,
+}
+
+#[derive(Deserialize)]
+struct ScanMessage {
+    model: Option<String>,
+    usage: Option<ScanUsage>,
+}
+
+#[derive(Deserialize)]
+struct ScanUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    output_tokens: u64,
+    #[serde(default)]
+    cache_creation_input_tokens: u64,
+    #[serde(default)]
+    cache_read_input_tokens: u64,
+}
+
+fn walk_jsonl(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(walk_jsonl(&p));
+        } else if p.extension().map(|x| x == "jsonl").unwrap_or(false) {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// Scan `~/.claude/projects/**/*.jsonl` for per-message token usage.
+/// One `UsageRecord` per assistant message that carries a `usage` block.
+pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
+    let mut out = Vec::new();
+    for path in walk_jsonl(&claude_home.join("projects")) {
+        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        for line in content.lines() {
+            let Ok(l) = serde_json::from_str::<ScanLine>(line) else { continue };
+            if l.kind.as_deref() != Some("assistant") { continue; }
+            let (Some(ts), Some(msg)) = (l.timestamp, l.message) else { continue };
+            let Some(usage) = msg.usage else { continue };
+            let Some(ym) = year_month_of(&ts) else { continue };
+            out.push(UsageRecord {
+                year_month: ym,
+                provider: ProviderId::Claude,
+                model: msg.model.unwrap_or_else(|| "unknown".to_string()),
+                input_tokens: usage.input_tokens,
+                output_tokens: usage.output_tokens,
+                cache_write_tokens: usage.cache_creation_input_tokens,
+                cache_read_tokens: usage.cache_read_input_tokens,
+                cached_input_tokens: 0,
+            });
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -589,5 +658,27 @@ mod tests {
         let s = super::get().await.unwrap();
         assert_eq!(s.windows.len(), 3);
         println!("plan={} windows={:?}", s.plan, s.windows);
+    }
+
+    #[test]
+    fn scan_usage_reads_assistant_messages() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pdir = home.join("projects/some-project");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let line = r#"{"type":"assistant","timestamp":"2026-07-08T06:09:03.964Z","message":{"model":"claude-sonnet-5","usage":{"input_tokens":100,"output_tokens":20,"cache_creation_input_tokens":30,"cache_read_input_tokens":40}}}"#;
+        let noise = r#"{"type":"user","timestamp":"2026-07-08T06:09:00.000Z","message":{"role":"user"}}"#;
+        std::fs::write(pdir.join("s.jsonl"), format!("{line}\n{noise}\nbroken line\n")).unwrap();
+
+        let recs = scan_usage(home);
+        assert_eq!(recs.len(), 1);
+        let r = &recs[0];
+        assert_eq!(r.year_month, "2026-07");
+        assert_eq!(r.provider, ProviderId::Claude);
+        assert_eq!(r.model, "claude-sonnet-5");
+        assert_eq!(r.input_tokens, 100);
+        assert_eq!(r.output_tokens, 20);
+        assert_eq!(r.cache_write_tokens, 30);
+        assert_eq!(r.cache_read_tokens, 40);
     }
 }
