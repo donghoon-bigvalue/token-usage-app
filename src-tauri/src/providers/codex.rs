@@ -177,15 +177,6 @@ fn last_populated_rate_limits_in(content: &str) -> Option<String> {
         .find(|obj| is_populated(obj))
 }
 
-pub fn latest_rollout_rate_limits(codex_home: &Path) -> Result<String, CodexError> {
-    let (path, _) = rollouts_newest_first(codex_home)
-        .into_iter()
-        .next()
-        .ok_or(CodexError::NoRollout)?;
-    let content = std::fs::read_to_string(&path).map_err(|_| CodexError::NoRollout)?;
-    last_rate_limits_in(&content).ok_or(CodexError::NoRollout)
-}
-
 /// The most recent POPULATED `rate_limits` object across rollout files (newest
 /// file first, newest line within each), paired with that file's mtime (unix
 /// secs) so the UI can show how fresh the numbers are. Skips null-window
@@ -295,13 +286,13 @@ mod tests {
     }
 
     #[test]
-    fn extracts_last_rate_limits_from_rollout() {
+    fn snapshot_selects_newest_populated_reading() {
         let dir = std::env::temp_dir().join(format!("codex-roll-{}", std::process::id()));
         let sdir = dir.join("sessions/2026/07/14");
         std::fs::create_dir_all(&sdir).unwrap();
         let content = include_str!("../../tests/fixtures/rollout_sample.jsonl");
         std::fs::write(sdir.join("rollout-2026-07-14T09-00-00-abc.jsonl"), content).unwrap();
-        let rl = latest_rollout_rate_limits(&dir).unwrap();
+        let (rl, _mtime) = latest_rollout_snapshot(&dir).unwrap();
         // 마지막(최신) 스냅샷: primary 73.0
         assert!(rl.contains("73"));
         let s = parse_rate_limits(&rl, "", Source::Cache, 0).unwrap();

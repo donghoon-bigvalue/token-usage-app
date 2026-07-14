@@ -1,3 +1,4 @@
+use crate::model::WindowId;
 use crate::settings::Settings;
 use crate::usage;
 use std::collections::HashMap;
@@ -12,6 +13,30 @@ pub fn crossed_thresholds(prev: Option<f64>, now: f64, thresholds: &[u8]) -> Vec
         .copied()
         .filter(|&t| now >= t as f64 && prev.map(|p| p < t as f64).unwrap_or(true))
         .collect()
+}
+
+/// Localized window label — mirrors the frontend `window.*` i18n strings so the
+/// notification reads the same as the in-app label (not a raw enum name).
+fn window_label(id: WindowId, lang: &str) -> &'static str {
+    let ko = lang == "ko";
+    match id {
+        WindowId::ClaudeSession => if ko { "현재 세션" } else { "Current session" },
+        WindowId::ClaudeWeeklyAll => if ko { "이번 주 (전체 모델)" } else { "Current week (all models)" },
+        WindowId::ClaudeWeeklyFable => if ko { "이번 주 (Fable)" } else { "Current week (Fable)" },
+        WindowId::CodexFiveHour => if ko { "현재 5시간" } else { "Current 5-hour" },
+        WindowId::CodexWeekly => if ko { "주간 한도" } else { "Weekly limit" },
+        WindowId::CodexSparkWeekly => if ko { "Spark 주간 한도" } else { "Spark weekly limit" },
+    }
+}
+
+/// Localized notification (title, body) for a threshold crossing.
+fn notify_text(id: WindowId, percent: u8, lang: &str) -> (String, String) {
+    let label = window_label(id, lang);
+    if lang == "ko" {
+        ("토큰 사용량".to_string(), format!("{label}이(가) {percent}%에 도달했어요"))
+    } else {
+        ("Token Usage".to_string(), format!("{label} reached {percent}%"))
+    }
 }
 
 fn load_settings(app: &AppHandle) -> Settings {
@@ -45,12 +70,8 @@ pub fn start(app: AppHandle) {
                     let prev = last.lock().unwrap().get(&key).copied();
                     let fired = crossed_thresholds(prev, w.used_percent, &settings.notify_thresholds);
                     for t in fired {
-                        let _ = app
-                            .notification()
-                            .builder()
-                            .title("Token Usage")
-                            .body(format!("{:?} reached {}%", w.id, t))
-                            .show();
+                        let (title, body) = notify_text(w.id, t, &settings.language);
+                        let _ = app.notification().builder().title(title).body(body).show();
                     }
                     last.lock().unwrap().insert(key, w.used_percent);
                 }
@@ -80,5 +101,15 @@ mod tests {
     #[test]
     fn no_refire_when_already_above() {
         assert_eq!(crossed_thresholds(Some(85.0), 90.0, &[80, 100]), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn notify_text_is_localized_not_debug() {
+        let (title_en, body_en) = notify_text(WindowId::ClaudeWeeklyFable, 80, "en");
+        assert_eq!(title_en, "Token Usage");
+        assert_eq!(body_en, "Current week (Fable) reached 80%");
+        let (title_ko, body_ko) = notify_text(WindowId::CodexWeekly, 100, "ko");
+        assert_eq!(title_ko, "토큰 사용량");
+        assert_eq!(body_ko, "주간 한도이(가) 100%에 도달했어요");
     }
 }
