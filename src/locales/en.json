@@ -1,5 +1,5 @@
 {
-  "app": { "title": "Token Usage", "refresh": "Refresh", "settings": "Settings", "lastUpdated": "Updated {{time}}", "cached": "cached" },
+  "app": { "title": "Token Usage", "refresh": "Refresh", "settings": "Settings", "close": "Close", "lastUpdated": "Updated {{time}}", "cached": "cached" },
   "provider": { "claude": "Claude", "codex": "Codex", "plan": "Plan", "connect": "Sign in with the {{name}} CLI to see usage", "unavailable": "No data" },
   "window": {
     "claude_session": "Current session",

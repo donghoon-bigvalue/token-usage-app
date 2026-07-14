@@ -5,6 +5,8 @@
   --muted: #6b6b6b;
   --track: #e6e6e6;
   --border: #e0e0e0;
+  /* Render native controls (select popup, spinner) light. */
+  color-scheme: light;
 }
 [data-theme="dark"] {
   --bg: #1b1b1d;
@@ -13,6 +15,8 @@
   --muted: #a0a0a0;
   --track: #3a3a3d;
   --border: #38383b;
+  /* Without this the native <select> popup stays white → white-on-white text. */
+  color-scheme: dark;
 }
 .provider-claude { --accent: #D97757; }
 .provider-codex  { --accent: #5162ED; }
@@ -42,6 +46,37 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .app-header__actions { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .app-header__updated { color: var(--muted); }
 .app__cards { display: flex; flex-direction: column; gap: 14px; }
-.settings-panel { display: flex; flex-wrap: wrap; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+.settings-panel { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
 .settings-panel label { display: flex; flex-direction: column; font-size: 12px; gap: 4px; color: var(--muted); }
+/* Normalize control heights so the auto-refresh number input lines up with the
+   language/theme selects (issue #7-1). */
+.settings-panel select,
+.settings-panel input {
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+/* Fallback for renderers that don't fully honor color-scheme on the popup. */
+.settings-panel select option {
+  color: var(--text);
+  background: var(--card);
+}
+/* Close button: square, pinned to the far right of the panel (issue #7-2). */
+.settings-panel__close {
+  box-sizing: border-box;
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
 button { cursor: pointer; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
