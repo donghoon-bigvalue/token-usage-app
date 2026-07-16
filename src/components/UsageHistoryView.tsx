@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getUsageHistory, downloadUsageXlsx } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
 import { formatTokens, formatUsd } from "../lib/format";
+import { HistorySkeleton } from "./HistorySkeleton";
 
 const ACCENT: Record<"claude" | "codex", string> = {
   claude: "#D97757",
@@ -70,7 +71,13 @@ export default function UsageHistoryView({
     }
   };
 
-  if (loading) return <div className="history-loading">…</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label={t("app.loading")}>
+        <HistorySkeleton />
+      </div>
+    );
+  }
   // A failed load must not masquerade as "no usage yet".
   if (loadError && !history) {
     return <div className="error-banner" role="alert">{t("history.loadFailed")}: {loadError}</div>;

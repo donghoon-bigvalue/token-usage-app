@@ -113,4 +113,36 @@ describe("UsageHistoryView", () => {
     // Table survives — a failed refresh must not blank out the view.
     expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0);
   });
+
+  it("shows a table-shaped skeleton on a cold load, not an ellipsis", async () => {
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+
+    render(<UsageHistoryView />);
+
+    expect(screen.getByTestId("history-skeleton")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText("…")).toBeNull();
+
+    release(HISTORY);
+    await screen.findByText("Download Excel");
+    expect(screen.queryByTestId("history-skeleton")).toBeNull();
+  });
+
+  it("keeps the table on screen during a refresh instead of falling back to the skeleton", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} />);
+    await screen.findByText("Download Excel");
+
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+    rerender(<UsageHistoryView refreshSignal={1} />);
+
+    // Data the user has already read must not revert to grey blocks.
+    expect(screen.queryByTestId("history-skeleton")).toBeNull();
+    expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0);
+
+    release(HISTORY);
+    await waitFor(() => expect(getUsageHistory).toHaveBeenCalledTimes(2));
+  });
 });

@@ -173,6 +173,8 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
   to { transform: rotate(360deg); }
 }
 
+.history-skeleton__rows { display: flex; flex-direction: column; gap: 6px; }
+
 /* Motion here is the whole point (a static block reads as "frozen"), but a
    reader who asked for no motion gets the static block anyway. */
 @media (prefers-reduced-motion: reduce) {
