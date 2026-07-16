@@ -6,14 +6,16 @@ import { applyTheme } from "./theme";
 import type { UsageReport, Settings } from "./lib/types";
 import { Header } from "./components/Header";
 import { ProviderCard } from "./components/ProviderCard";
+import { ProviderCardSkeleton } from "./components/ProviderCardSkeleton";
 import { SettingsPanel } from "./components/SettingsPanel";
 import UsageHistoryView from "./components/UsageHistoryView";
 import "./styles/theme.css";
 
 export default function App() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [report, setReport] = useState<UsageReport | null>(null);
   const [settings, setSettingsState] = useState<Settings | null>(null);
+  const [loadFailed, setLoadFailed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<"limits" | "history">("limits");
@@ -29,6 +31,16 @@ export default function App() {
     setReport((prev) => mergeReport(prev, next));
   }, []);
 
+  // The one place limits are fetched — a rejection here used to vanish, leaving
+  // the card area blank forever. Now it resolves the loading state instead.
+  const load = useCallback(
+    () =>
+      fetchUsage()
+        .then((r) => { applyReport(r); setLoadFailed(null); })
+        .catch((e) => setLoadFailed(e instanceof Error ? e.message : String(e))),
+    [applyReport]
+  );
+
   // 초기 로드
   useEffect(() => {
     getSettings().then((s) => {
@@ -36,10 +48,10 @@ export default function App() {
       applyTheme(s.theme);
       i18n.changeLanguage(s.language);
     });
-    fetchUsage().then(applyReport);
+    load();
     const un = onUsageUpdated(applyReport);
     return () => { un.then((f) => f()); };
-  }, [i18n, applyReport]);
+  }, [i18n, applyReport, load]);
 
   // 카운트다운 틱
   useEffect(() => {
@@ -49,8 +61,8 @@ export default function App() {
 
   const refresh = useCallback(() => {
     if (view === "history") setHistoryRefresh((n) => n + 1);
-    else fetchUsage().then(applyReport);
-  }, [view, applyReport]);
+    else load();
+  }, [view, load]);
 
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
@@ -75,10 +87,17 @@ export default function App() {
         <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />
       )}
       {view === "limits" ? (
-        report && (
+        report ? (
           <div className="app__cards">
             <ProviderCard snapshot={report.claude} now={now} locale={locale} />
             <ProviderCard snapshot={report.codex} now={now} locale={locale} />
+          </div>
+        ) : loadFailed ? (
+          <p className="error-banner" role="alert">{t("app.loadFailed")}: {loadFailed}</p>
+        ) : (
+          <div className="app__cards" role="status" aria-label={t("app.loading")}>
+            <ProviderCardSkeleton bars={3} />
+            <ProviderCardSkeleton bars={2} />
           </div>
         )
       ) : (

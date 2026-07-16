@@ -73,7 +73,7 @@ export default function UsageHistoryView({
   if (loading) return <div className="history-loading">…</div>;
   // A failed load must not masquerade as "no usage yet".
   if (loadError && !history) {
-    return <div className="history-error" role="alert">{t("history.loadFailed")}: {loadError}</div>;
+    return <div className="error-banner" role="alert">{t("history.loadFailed")}: {loadError}</div>;
   }
   if (!history || history.summaries.length === 0) {
     return <div className="empty-state">{t("history.empty")}</div>;
@@ -140,10 +140,10 @@ export default function UsageHistoryView({
       </button>
 
       {loadError && (
-        <p className="history-error" role="alert">{t("history.refreshFailed")}: {loadError}</p>
+        <p className="error-banner" role="alert">{t("history.refreshFailed")}: {loadError}</p>
       )}
       {downloadError && (
-        <p className="history-error" role="alert">{t("history.downloadFailed")}: {downloadError}</p>
+        <p className="error-banner" role="alert">{t("history.downloadFailed")}: {downloadError}</p>
       )}
     </div>
   );

@@ -115,4 +115,35 @@ describe("App", () => {
     await waitFor(() => expect(invoked("get_usage").length).toBe(before + 1));
     expect(invoked("get_usage_history")).toHaveLength(0);
   });
+
+  it("shows a skeleton — not a blank screen — while the first load is in flight", async () => {
+    let release!: (r: typeof report) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage"
+        ? new Promise((res) => { release = res as (r: typeof report) => void; })
+        : defaultInvoke(cmd)) as never);
+
+    render(<App />);
+
+    // Two cards' worth of skeleton, matching the real layout.
+    expect(screen.getAllByTestId("provider-skeleton")).toHaveLength(2);
+    expect(screen.getByRole("status")).toBeInTheDocument();
+
+    release(report);
+    await screen.findByText("Max 20x");
+    expect(screen.queryByTestId("provider-skeleton")).toBeNull();
+  });
+
+  it("reports a failed first load instead of shimmering forever", async () => {
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage" ? Promise.reject(new Error("claude cli missing")) : defaultInvoke(cmd)) as never);
+
+    render(<App />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("claude cli missing");
+    // The whole point: a skeleton that never resolves is worse than the blank
+    // screen it replaced.
+    expect(screen.queryByTestId("provider-skeleton")).toBeNull();
+  });
 });
