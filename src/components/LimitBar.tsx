@@ -21,7 +21,9 @@ export function LimitBar({
   // omitted it conditionally, every unavailable or countdown-less window
   // would render shorter than the skeleton predicted. Rendering it in both
   // branches — with a non-breaking space when there's nothing to show —
-  // keeps every bar the same height.
+  // keeps every bar the same height. Written as `\u00A0` rather than a
+  // literal character so the non-breaking space stays visible in source and
+  // diffs, instead of looking like a plain space that's safe to "tidy" away.
   if (!window.available) {
     return (
       <div className="limit-bar limit-bar--unavailable">
@@ -30,7 +32,7 @@ export function LimitBar({
           <span className="limit-bar__muted">{t("provider.unavailable")}</span>
         </div>
         <div className="limit-bar__track"><div data-testid="bar-fill" className="limit-bar__fill" style={{ width: "0%" }} /></div>
-        <div className="limit-bar__reset">{" "}</div>
+        <div className="limit-bar__reset">{"\u00A0"}</div>
       </div>
     );
   }
@@ -45,7 +47,7 @@ export function LimitBar({
         <div data-testid="bar-fill" className="limit-bar__fill" style={{ width: `${pct}%`, background: "var(--accent)" }} />
       </div>
       <div className="limit-bar__reset">
-        {window.resets_at != null ? formatCountdown(window.resets_at, now, locale) : " "}
+        {window.resets_at != null ? formatCountdown(window.resets_at, now, locale) : "\u00A0"}
       </div>
     </div>
   );
