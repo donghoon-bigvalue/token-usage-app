@@ -21,16 +21,18 @@ export function Header({
     : "—";
   return (
     <header className="app-header">
-      <h1 className="app-header__title">{t("app.title")}</h1>
-      <div className="view-toggle">
-        <button
-          className={view === "limits" ? "active" : ""}
-          onClick={() => onViewChange("limits")}
-        >{t("history.limitsTab")}</button>
-        <button
-          className={view === "history" ? "active" : ""}
-          onClick={() => onViewChange("history")}
-        >{t("history.tab")}</button>
+      <div className="app-header__nav">
+        <h1 className="app-header__title">{t("app.title")}</h1>
+        <div className="view-toggle">
+          <button
+            className={view === "limits" ? "active" : ""}
+            onClick={() => onViewChange("limits")}
+          >{t("history.limitsTab")}</button>
+          <button
+            className={view === "history" ? "active" : ""}
+            onClick={() => onViewChange("history")}
+          >{t("history.tab")}</button>
+        </div>
       </div>
       <div className="app-header__actions">
         <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
