@@ -202,4 +202,21 @@ describe("UsageHistoryView", () => {
 
     expect(onLoadingChange).not.toHaveBeenCalled();
   });
+
+  it("marks the download button busy while the export runs", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    let release!: () => void;
+    downloadUsageXlsx.mockReturnValue(new Promise<void>((res) => { release = res; }));
+
+    render(<UsageHistoryView />);
+    const label = await screen.findByText("Download Excel");
+    const button = label.closest("button")!;
+    expect(button.getAttribute("aria-busy")).toBe("false");
+
+    fireEvent.click(label);
+    await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("true"));
+
+    release();
+    await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("false"));
+  });
 });

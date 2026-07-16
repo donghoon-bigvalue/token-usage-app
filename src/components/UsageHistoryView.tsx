@@ -4,6 +4,7 @@ import { getUsageHistory, downloadUsageXlsx } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
 import { formatTokens, formatUsd } from "../lib/format";
 import { HistorySkeleton } from "./HistorySkeleton";
+import { Spinner } from "./Spinner";
 
 const ACCENT: Record<"claude" | "codex", string> = {
   claude: "#D97757",
@@ -156,8 +157,9 @@ export default function UsageHistoryView({
         </tbody>
       </table>
 
-      <button className="history-download" onClick={onDownload} disabled={downloading}>
-        {t("history.download")}
+      <button className="history-download" onClick={onDownload} disabled={downloading} aria-busy={downloading}>
+        <Spinner spinning={downloading} />
+        <span>{t("history.download")}</span>
       </button>
 
       {loadError && (
