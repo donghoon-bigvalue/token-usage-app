@@ -677,15 +677,33 @@ git commit -m "feat(ui): 이력 탭 콜드 로드 스켈레톤으로 … 교체 
     getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseSecond = res; }));
     rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
 
-    releaseFirst(HISTORY);
-    await waitFor(() => expect(onLoadingChange.mock.calls.length).toBeGreaterThanOrEqual(2));
+    // Drain the stale scan's whole .then/.catch/.finally chain before asserting,
+    // so the assertion tests the guard rather than microtask timing.
+    await act(async () => { releaseFirst(HISTORY); });
     // The stale scan must not clear the flag — scan two is still running.
     expect(onLoadingChange).toHaveBeenLastCalledWith(true);
 
-    releaseSecond(HISTORY);
-    await waitFor(() => expect(onLoadingChange).toHaveBeenLastCalledWith(false));
+    await act(async () => { releaseSecond(HISTORY); });
+    expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("goes silent after unmount — a dead scan must not speak for a live one", async () => {
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+    const onLoadingChange = vi.fn();
+    const { unmount } = render(<UsageHistoryView onLoadingChange={onLoadingChange} />);
+    await waitFor(() => expect(onLoadingChange).toHaveBeenCalledWith(true));
+
+    // The user switches tabs mid-scan; App owns the flag and clears it itself.
+    unmount();
+    onLoadingChange.mockClear();
+    await act(async () => { release(HISTORY); });
+
+    expect(onLoadingChange).not.toHaveBeenCalled();
   });
 ```
+
+> `act`를 `@testing-library/react` 임포트에 추가한다: `import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";`
 
 - [ ] **Step 2: 테스트 실패 확인**
 
@@ -708,14 +726,11 @@ export default function UsageHistoryView({
 }) {
 ```
 
-`onScannedAtRef`(40-41행) 옆에 ref 두 개를 추가:
+`onScannedAtRef`(40-41행) 옆에 ref를 추가:
 
 ```tsx
   const onLoadingChangeRef = useRef(onLoadingChange);
   onLoadingChangeRef.current = onLoadingChange;
-  // Identifies the newest scan, so a superseded one resolving late can't clear
-  // the parent's busy flag out from under the scan still running.
-  const loadSeq = useRef(0);
 ```
 
 effect(43-59행)를 교체:
@@ -723,7 +738,6 @@ effect(43-59행)를 교체:
 ```tsx
   useEffect(() => {
     let alive = true;
-    const seq = ++loadSeq.current;
     const isRefresh = refreshSignal !== seenSignal.current;
     seenSignal.current = refreshSignal;
     // A refresh keeps the old table on screen; only a cold mount blanks it.
@@ -738,11 +752,14 @@ effect(43-59행)를 교체:
       })
       .catch((e) => { if (alive) setLoadError(reason(e)); })
       .finally(() => {
-        // Reported even after unmount — the parent owns this flag and would
-        // otherwise spin forever if the user switched tabs mid-scan. Gated on
-        // seq so back-to-back refreshes don't stop the spinner early.
-        if (seq === loadSeq.current) onLoadingChangeRef.current?.(false);
-        if (alive) setLoading(false);
+        // Only a live run reports. A superseded run (cleanup already set alive
+        // false) staying silent is what keeps back-to-back refreshes from
+        // stopping the spinner early; App clears the flags when the tab closes,
+        // so a dead mount never speaks for a live one.
+        if (alive) {
+          onLoadingChangeRef.current?.(false);
+          setLoading(false);
+        }
       });
     return () => { alive = false; };
   }, [refreshSignal]);
@@ -830,7 +847,46 @@ Expected: PASS (15 tests — Task 3의 12 + 신규 3)
     release(history);
     await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
   });
+
+  it("abandons a history refresh when the user leaves the tab mid-scan", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+    fireEvent.click(screen.getByText("Usage history"));
+    await waitFor(() => expect(invoked("get_usage_history")).toHaveLength(1));
+
+    // Press refresh, then walk away before the scan finishes.
+    let releaseStale!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { releaseStale = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("true"));
+
+    fireEvent.click(screen.getByText("Limits"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+
+    // Coming back is a cold load the user never asked for — the abandoned press
+    // must not spin the button for it.
+    let releaseFresh!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { releaseFresh = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+    fireEvent.click(screen.getByText("Usage history"));
+    await screen.findByTestId("history-skeleton");
+    expect(refreshButton().getAttribute("aria-busy")).toBe("false");
+
+    // The abandoned scan landing late must not stop the live one either.
+    await act(async () => { releaseStale(history); });
+    expect(screen.getByTestId("history-skeleton")).toBeInTheDocument();
+
+    await act(async () => { releaseFresh(history); });
+    await waitFor(() => expect(screen.queryByTestId("history-skeleton")).toBeNull());
+  });
 ```
+
+> `act`를 `App.test.tsx`의 `@testing-library/react` 임포트에 추가한다.
 
 - [ ] **Step 6: 테스트 실패 확인**
 
@@ -910,6 +966,17 @@ export function Header({
     setHistoryBusy(busy);
     if (!busy) setRefreshPressed(false);
   }, []);
+
+  // Leaving the history tab unmounts the view mid-scan, and these flags are
+  // ours, not its — without this a press abandoned by a tab switch stays
+  // pending and spins the button on the next cold load, which the user never
+  // pressed.
+  useEffect(() => {
+    if (view !== "history") {
+      setHistoryBusy(false);
+      setRefreshPressed(false);
+    }
+  }, [view]);
 ```
 
 `Header`에 prop 전달 (66-73행 구역, `onViewChange` 다음 줄):
