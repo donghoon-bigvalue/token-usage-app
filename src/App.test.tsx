@@ -290,4 +290,21 @@ describe("App", () => {
     expect(screen.getByText("Updated —")).toBeInTheDocument();
     expect(container.querySelector(".app-header .skeleton")).toBeNull();
   });
+
+  it("falls back to a dash on the history tab too, when the scan fails — historyBusy must still clear via .finally()", async () => {
+    const { container } = render(<App />);
+    await screen.findByText("Max 20x");
+
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history" ? Promise.reject(new Error("scan boom")) : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Usage history"));
+
+    await screen.findByRole("alert");
+
+    // historyBusy must go false even though onScannedAt never fired, or the
+    // header shimmers forever instead of settling on the dash.
+    expect(screen.getByText("Updated —")).toBeInTheDocument();
+    expect(container.querySelector(".app-header .skeleton")).toBeNull();
+  });
 });
