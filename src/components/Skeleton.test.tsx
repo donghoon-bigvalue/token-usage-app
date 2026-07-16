@@ -38,14 +38,26 @@ describe("Spinner", () => {
     const { container } = render(<Spinner spinning={true} />);
     expect((container.firstChild as HTMLElement).getAttribute("aria-hidden")).toBe("true");
   });
+
+  it("shows a custom idle glyph at rest, and the busy glyph once spinning", () => {
+    const { rerender, container } = render(<Spinner spinning={false} idle="⬇" />);
+    const el = () => container.firstChild as HTMLElement;
+    expect(el().textContent).toBe("⬇");
+
+    rerender(<Spinner spinning={true} idle="⬇" />);
+    expect(el().textContent).toBe("↻");
+  });
 });
 
 describe("ProviderCardSkeleton", () => {
-  it("reserves the real text line box on its flex rows", () => {
+  it("wires the flex-row height modifier classes that theme.css uses to reserve the real text line box", () => {
     // These rows take their height from their children, so without the
     // modifier the card grows when data lands — the shift a skeleton exists
-    // to prevent. jsdom can't see the pixels; this guards the wiring the CSS
-    // hangs off.
+    // to prevent. jsdom has no layout engine, so this can only confirm the
+    // modifier classes CSS hangs its `height` rule off are present — not that
+    // the pixel heights actually match. Deleting the `height` rule in
+    // theme.css would still pass this test; that has to be caught by a
+    // browser re-measurement instead.
     const { container } = render(<ProviderCardSkeleton bars={3} />);
     expect(container.querySelector(".provider-card__head--skeleton")).not.toBeNull();
     expect(container.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(3);
@@ -58,18 +70,19 @@ describe("HistorySkeleton", () => {
     // all, so the button's height (plus the gap before it) appeared out of
     // nowhere when data landed. This asserts the placeholder exists.
     const { container } = render(<HistorySkeleton />);
-    expect(container.querySelector(".history-download--skeleton")).not.toBeNull();
+    expect(container.querySelector(".history-skeleton__download")).not.toBeNull();
   });
 
-  it("reserves the real text line box on its title, note, and card rows", () => {
+  it("wires the title, note, and card-row height modifier classes that theme.css uses to reserve the real text line box", () => {
     // Same wiring as ProviderCardSkeleton: these containers take their height
     // from children, so without the modifiers the view grows when the bare
-    // skeleton blocks are replaced by real text's taller line box.
+    // skeleton blocks are replaced by real text's taller line box. As above,
+    // this only guards the classes' presence, not the pixel values.
     const { container } = render(<HistorySkeleton />);
-    expect(container.querySelector(".history-title--skeleton")).not.toBeNull();
-    expect(container.querySelector(".history-note--skeleton")).not.toBeNull();
-    expect(container.querySelectorAll(".history-card-title--skeleton")).toHaveLength(2);
-    expect(container.querySelectorAll(".history-card-tokens--skeleton")).toHaveLength(2);
-    expect(container.querySelectorAll(".history-card-cost--skeleton")).toHaveLength(2);
+    expect(container.querySelector(".history-skeleton__title")).not.toBeNull();
+    expect(container.querySelector(".history-skeleton__note")).not.toBeNull();
+    expect(container.querySelectorAll(".history-skeleton__card-title")).toHaveLength(2);
+    expect(container.querySelectorAll(".history-skeleton__card-tokens")).toHaveLength(2);
+    expect(container.querySelectorAll(".history-skeleton__card-cost")).toHaveLength(2);
   });
 });
