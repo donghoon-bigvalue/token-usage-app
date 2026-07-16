@@ -1,4 +1,6 @@
-use crate::model::{LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
+use crate::model::{
+    year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId,
+};
 use base64::Engine;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -576,6 +578,68 @@ pub async fn get() -> Result<UsageSnapshot, CodexError> {
     parse_rate_limits(&json, &plan_type, Source::Cache, updated_at)
 }
 
+// ---- Historical usage scan (issue #19) ----
+
+#[derive(serde::Deserialize)]
+struct ScanLine {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    timestamp: Option<String>,
+    payload: Option<serde_json::Value>,
+}
+
+/// Scan `~/.codex/sessions/**/*.jsonl`. Each `token_count` event contributes its
+/// `last_token_usage` delta, bucketed by the event month and attributed to the
+/// most recent `turn_context.model` seen in that file.
+///
+/// Real rollout logs carry the `turn_context` discriminant at the TOP LEVEL
+/// (`{"type":"turn_context","payload":{"model":...}}`) — the payload itself has
+/// no `"type"` key for these lines. `token_count` events, by contrast, are
+/// wrapped in an `event_msg` envelope with the discriminant INSIDE `payload`
+/// (`{"type":"event_msg","payload":{"type":"token_count",...}}`).
+pub fn scan_usage(codex_home: &Path) -> Vec<UsageRecord> {
+    let mut out = Vec::new();
+    for path in walk_jsonl(&codex_home.join("sessions")) {
+        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        let mut current_model = "unknown".to_string();
+        for line in content.lines() {
+            let Ok(l) = serde_json::from_str::<ScanLine>(line) else { continue };
+            if l.kind.as_deref() == Some("turn_context") {
+                if let Some(m) = l
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("model"))
+                    .and_then(|v| v.as_str())
+                {
+                    current_model = m.to_string();
+                }
+                continue;
+            }
+            let Some(payload) = l.payload.as_ref() else { continue };
+            if payload.get("type").and_then(|v| v.as_str()) == Some("token_count") {
+                let Some(ym) = l.timestamp.as_deref().and_then(year_month_of) else { continue };
+                let Some(last) = payload.get("info").and_then(|i| i.get("last_token_usage")) else { continue };
+                let get = |k: &str| last.get(k).and_then(|v| v.as_u64()).unwrap_or(0);
+                let input = get("input_tokens");
+                let cached = get("cached_input_tokens");
+                let output = get("output_tokens");
+                if input == 0 && output == 0 { continue; }
+                out.push(UsageRecord {
+                    year_month: ym,
+                    provider: ProviderId::Codex,
+                    model: current_model.clone(),
+                    input_tokens: input,
+                    output_tokens: output,
+                    cache_write_tokens: 0,
+                    cache_read_tokens: 0,
+                    cached_input_tokens: cached,
+                });
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -752,5 +816,28 @@ mod tests {
         assert!(json.contains("73"));
         assert!(mtime > 0, "mtime should be a real unix timestamp");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn scan_usage_sums_last_token_deltas_by_model() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let sdir = home.join("sessions/2026/07/14");
+        std::fs::create_dir_all(&sdir).unwrap();
+        let ctx = r#"{"type":"turn_context","timestamp":"2026-07-14T00:00:00.000Z","payload":{"model":"gpt-5.5"}}"#;
+        let tc1 = r#"{"type":"event_msg","timestamp":"2026-07-14T00:01:00.000Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1000,"cached_input_tokens":400,"output_tokens":50}}}}"#;
+        let tc2 = r#"{"type":"event_msg","timestamp":"2026-07-14T00:02:00.000Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0}}}}"#;
+        std::fs::write(sdir.join("rollout-x.jsonl"), format!("{ctx}\n{tc1}\n{tc2}\nbroken\n")).unwrap();
+
+        let recs = scan_usage(home);
+        // tc2 is all-zero and skipped; only tc1 recorded
+        assert_eq!(recs.len(), 1);
+        let r = &recs[0];
+        assert_eq!(r.year_month, "2026-07");
+        assert_eq!(r.provider, ProviderId::Codex);
+        assert_eq!(r.model, "gpt-5.5");
+        assert_eq!(r.input_tokens, 1000);
+        assert_eq!(r.cached_input_tokens, 400);
+        assert_eq!(r.output_tokens, 50);
     }
 }

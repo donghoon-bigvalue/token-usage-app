@@ -5,11 +5,15 @@ export function Header({
   onOpenSettings,
   updatedAt,
   locale,
+  view,
+  onViewChange,
 }: {
   onRefresh: () => void;
   onOpenSettings: () => void;
   updatedAt: number | null;
   locale: "en" | "ko";
+  view: "limits" | "history";
+  onViewChange: (v: "limits" | "history") => void;
 }) {
   const { t } = useTranslation();
   const timeStr = updatedAt
@@ -17,7 +21,19 @@ export function Header({
     : "—";
   return (
     <header className="app-header">
-      <h1 className="app-header__title">{t("app.title")}</h1>
+      <div className="app-header__nav">
+        <h1 className="app-header__title">{t("app.title")}</h1>
+        <div className="view-toggle">
+          <button
+            className={view === "limits" ? "active" : ""}
+            onClick={() => onViewChange("limits")}
+          >{t("history.limitsTab")}</button>
+          <button
+            className={view === "history" ? "active" : ""}
+            onClick={() => onViewChange("history")}
+          >{t("history.tab")}</button>
+        </div>
+      </div>
       <div className="app-header__actions">
         <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
         <button onClick={onRefresh}>{t("app.refresh")}</button>

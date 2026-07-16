@@ -40,11 +40,18 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .limit-bar__reset { font-size: 11px; color: var(--muted); margin-top: 3px; }
 .limit-bar--unavailable { opacity: .5; }
 
-.app { max-width: 520px; margin: 0 auto; padding: 16px; }
-.app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.app-header__title { font-size: 18px; margin: 0; }
-.app-header__actions { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.app-header__updated { color: var(--muted); }
+/* 640 keeps the header on one line in English, whose labels need ~594px with
+   padding. At 520 they overflowed the bar. */
+.app { max-width: 640px; margin: 0 auto; padding: 16px; }
+/* Two groups: title+tabs on the left, actions on the right. Nothing in the bar
+   wraps — English labels are wider than Korean and used to break onto a second
+   line, which shifted the whole header. */
+.app-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 14px; }
+.app-header__nav { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.app-header__title { font-size: 18px; margin: 0; white-space: nowrap; }
+.app-header__actions { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-shrink: 0; }
+.app-header__actions button { white-space: nowrap; }
+.app-header__updated { color: var(--muted); white-space: nowrap; }
 .app__cards { display: flex; flex-direction: column; gap: 14px; }
 .settings-panel { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
 .settings-panel label { display: flex; flex-direction: column; font-size: 12px; gap: 4px; color: var(--muted); }
@@ -80,3 +87,71 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
   line-height: 1;
 }
 button { cursor: pointer; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
+
+/* View toggle (Header: 한도 / 사용 이력) */
+.view-toggle { display: flex; gap: 4px; background: var(--track); border-radius: 999px; padding: 3px; flex-shrink: 0; }
+.view-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.view-toggle button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+
+/* Usage history view */
+.history-view { display: flex; flex-direction: column; gap: 14px; }
+.history-current h2 { font-size: 15px; margin: 0 0 8px; }
+.history-cards { display: flex; gap: 12px; }
+.history-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.history-card-title { font-size: 13px; font-weight: 600; }
+.history-card-tokens { font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums; }
+.history-card-cost { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.history-note { font-size: 12px; color: var(--muted); margin: 0; }
+
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th,
+.history-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.history-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.history-table th:nth-child(3),
+.history-table th:nth-child(4),
+.history-table td:nth-child(3),
+.history-table td:nth-child(4) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-warn { color: var(--muted); cursor: help; }
+
+.history-download { align-self: flex-start; }
+
+.history-loading { color: var(--muted); font-size: 13px; padding: 12px 0; }
+
+.history-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #D9575780;
+  border-radius: 6px;
+  background: #D9575714;
+  color: #D95757;
+  font-size: 12px;
+  word-break: break-word;
+}

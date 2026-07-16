@@ -16,3 +16,22 @@ export function formatCountdown(
   if (d > 0) return `resets in ${d}d ${h}h ${m}m`;
   return h > 0 ? `resets in ${h}h ${m}m` : `resets in ${m}m`;
 }
+
+// Pinned to en-US rather than the host locale: the WebView resolved to one that
+// doesn't group, so token counts rendered as 4315471877. Korean groups numbers
+// the same way (comma groups, dot decimal), so one locale serves both UI
+// languages — and it matches the workbook's #,##0 columns.
+const TOKENS = new Intl.NumberFormat("en-US");
+const USD = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatTokens(n: number): string {
+  return TOKENS.format(n);
+}
+
+export function formatUsd(n: number | null): string {
+  if (n === null) return "—";
+  return `$${USD.format(n)}`;
+}

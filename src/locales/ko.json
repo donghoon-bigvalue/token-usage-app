@@ -8,5 +8,23 @@
     "codex_weekly": "주간 한도",
     "codex_spark_weekly": "Spark 주간 한도"
   },
-  "settings": { "language": "언어", "theme": "테마", "light": "라이트", "dark": "다크", "system": "시스템", "interval": "자동 새로고침 (초)", "thresholds": "알림 임계치 (%)" }
+  "settings": { "language": "언어", "theme": "테마", "light": "라이트", "dark": "다크", "system": "시스템", "interval": "자동 새로고침 (초)", "thresholds": "알림 임계치 (%)" },
+  "history": {
+    "tab": "사용 이력",
+    "limitsTab": "한도",
+    "thisMonth": "이번 달",
+    "tokens": "토큰",
+    "cost": "추정 비용",
+    "download": "Excel 다운로드",
+    "downloadFailed": "파일을 저장하지 못했어요",
+    "loadFailed": "사용 이력을 불러오지 못했어요",
+    "refreshFailed": "새로고침에 실패했어요 — 이전 결과를 보여주는 중",
+    "empty": "사용 기록이 없어요",
+    "estimateNote": "비용은 API 요금 기준 추정치예요 (구독제 실제 청구액과 무관)",
+    "notEstimable": "일부 모델 단가 미등록",
+    "colMonth": "연월",
+    "colProvider": "서비스",
+    "colTokens": "토큰",
+    "colCost": "추정 비용($)"
+  }
 }

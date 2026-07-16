@@ -7,6 +7,33 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-16
+
+월별 토큰 사용량·비용 추정 기능을 더한 첫 정식 릴리스입니다.
+
+### Added
+- **월별 사용 이력 탭** — Claude·Codex의 월별 토큰 사용량과 API 요금 기준 추정 비용을 표로 표시
+- **이번 달 요약 카드** — 서비스별 이번 달 토큰·비용을 한눈에 확인
+- **Excel(.xlsx) 다운로드** — 모델별 상세 내역을 워크북으로 내보내기
+  - `Usage`(영문)·`사용량`(한국어) 2개 시트, 수치는 동일
+  - 검은 배경 헤더, (월 × 서비스) 그룹별 회색 합계행
+- 로컬 로그(`~/.claude`, `~/.codex`) 스캔 기반 사용량 집계 — 네트워크 호출 없음
+- 모델별 공개 API 단가 테이블과 캐시 토큰을 반영한 비용 계산
+
+### Changed
+- 새로고침 버튼을 헤더 하나로 일원화 — 열린 탭에 따라 한도/이력 갱신
+- 헤더의 "갱신" 시각을 탭별로 분리 (한도=스냅샷 시각, 이력=스캔 시각)
+- 헤더 레이아웃을 제목+탭 / 액션 두 그룹으로 정리하고 콘텐츠 폭 확대
+
+### Fixed
+- 내보내기·스캔 실패가 아무 표시 없이 사라지던 문제 — 사유와 함께 표시
+- 토큰·비용에 천단위 구분자가 적용되지 않던 문제
+- 사용 이력을 불러오지 못했을 때 "사용 기록이 없어요"로 잘못 표시되던 문제
+
+### Notes
+- 비용은 공개 API 요금 기준 **추정치**로, 구독제 실제 청구액과 무관합니다.
+- Fable 단가는 공식 요금 공개 전까지 추정값을 사용합니다.
+
 ## [0.1.2] - 2026-07-14
 
 Codex 사용량 조회 개선 릴리스입니다.
@@ -56,7 +83,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...v1.0.0
 [0.1.2]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/donghoon-bigvalue/token-usage-app/releases/tag/v0.1.0
