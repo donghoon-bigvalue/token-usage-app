@@ -187,13 +187,16 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
    font-size) is shorter than the real text's line box (13px/15px/18px font
    render as 18px/20px/24px line boxes), and the download button has no
    skeleton counterpart at all — together these are what grew `.history-view`
-   by 87px when data landed. */
-.history-title--skeleton { height: 20px; margin-bottom: 8px; }
-.history-card-title--skeleton { height: 18px; }
-.history-card-tokens--skeleton { height: 18px; }
-.history-card-cost--skeleton { height: 24px; }
-.history-note--skeleton { height: 17px; }
-.history-download--skeleton { height: 25px; align-self: flex-start; }
+   by 87px when data landed. These wrappers never co-occur with a real base
+   class (unlike `.provider-card__head--skeleton` above), so they live in
+   their own `history-skeleton__*` namespace instead of the `--skeleton`
+   modifier suffix. */
+.history-skeleton__title { height: 20px; margin-bottom: 8px; }
+.history-skeleton__card-title { height: 18px; }
+.history-skeleton__card-tokens { height: 18px; }
+.history-skeleton__card-cost { height: 24px; }
+.history-skeleton__note { height: 17px; }
+.history-skeleton__download { height: 25px; align-self: flex-start; }
 
 /* Motion here is the whole point (a static block reads as "frozen"), but a
    reader who asked for no motion gets the static block anyway. */
