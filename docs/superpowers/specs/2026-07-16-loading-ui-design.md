@@ -66,6 +66,32 @@
 
 `types.ts`의 `WindowId` 기준으로 Claude는 3개(`claude_session`, `claude_weekly_all`, `claude_weekly_fable`), Codex는 2개(`codex_weekly`, `codex_spark_weekly`)다. 스켈레톤이 이 개수를 맞춰야 실제 데이터 도착 시 레이아웃 시프트가 없다 — 스켈레톤을 쓰는 이유 자체가 그것이다.
 
+### 4.4 개수만 맞추면 부족하다 — 행 높이도 맞춰야 한다
+
+바 개수가 맞아도 **행이 차지하는 세로 공간**이 다르면 카드가 자란다. 실측 결과 시프트가 총 38px이었다:
+
+| | 스켈레톤 | 실제 | 차이 |
+| --- | --- | --- | --- |
+| `.app__cards` 높이 | 398 | 436 | +38 |
+| `.limit-bar__row` | 12 | 18 | +6 (바 5개) |
+| `.provider-card__head` | 18 | 22 | +4 |
+
+원인은 두 가지가 겹친 것이다:
+
+1. `Skeleton`에 넘긴 높이는 **폰트 크기**(12·16px)인데, 실제 텍스트가 차지하는 것은 **line box**(13px→18px, 16px→22px)다.
+2. `.limit-bar__row`와 `.provider-card__head`는 `display: flex`라 컨테이너 높이가 자식 높이로 결정된다 — 텍스트라면 개입했을 strut이 없다.
+
+따라서 스켈레톤이 흉내내는 flex 행에는 **명시적 높이를 주는 모디파이어 클래스**를 붙인다:
+
+```css
+.provider-card__head--skeleton { height: 22px; }
+.limit-bar__row--skeleton { height: 18px; }
+```
+
+블록 자체는 얇게(12px) 두고 행만 실제 line box를 예약하므로, 시각적으로는 가볍고 레이아웃은 정확하다.
+
+> **이 결함은 jsdom 테스트로는 잡을 수 없다.** jsdom에 레이아웃이 없어 65개 테스트가 전부 통과하고 태스크 리뷰 6건이 승인된 뒤에도 남아 있었다. 실제 브라우저 측정에서만 드러났다. 단위 테스트는 모디파이어 클래스의 *존재*만 지킬 수 있고 픽셀 값은 지키지 못하므로, 스켈레톤 치수를 바꿀 때는 브라우저 재측정이 필요하다.
+
 ## 5. shimmer 구현
 
 기존 `--track`을 베이스로 `--card` 쪽으로 밝아지는 gradient를 만들고, `background-position`을 1.6s 선형으로 이동시킨다. 두 변수 모두 `[data-theme]`에 이미 정의돼 있어 라이트·다크가 자동 대응된다.
