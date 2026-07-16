@@ -9,14 +9,14 @@ import { Skeleton } from "./Skeleton";
 export function ProviderCardSkeleton({ bars }: { bars: number }) {
   return (
     <section className="provider-card" data-testid="provider-skeleton" aria-hidden="true">
-      <header className="provider-card__head">
+      <header className="provider-card__head provider-card__head--skeleton">
         <Skeleton width="84px" height={16} radius={6} />
         <Skeleton width="52px" height={18} />
       </header>
       <div className="provider-card__bars">
         {Array.from({ length: bars }, (_, i) => (
           <div className="limit-bar" key={i}>
-            <div className="limit-bar__row">
+            <div className="limit-bar__row limit-bar__row--skeleton">
               <Skeleton width="112px" height={12} radius={4} />
               <Skeleton width="32px" height={12} radius={4} />
             </div>

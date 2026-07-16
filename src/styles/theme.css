@@ -175,6 +175,13 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 
 .history-skeleton__rows { display: flex; flex-direction: column; gap: 6px; }
 
+/* These rows are flex, so their height comes from their children — real text
+   brings an 18px/22px line box, a bare skeleton block only its own 12px/16px,
+   and the card grew by 38px when data landed. Reserve the line box here and
+   the block stays thin without moving anything. */
+.provider-card__head--skeleton { height: 22px; }
+.limit-bar__row--skeleton { height: 18px; }
+
 /* Motion here is the whole point (a static block reads as "frozen"), but a
    reader who asked for no motion gets the static block anyway. */
 @media (prefers-reduced-motion: reduce) {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { Skeleton } from "./Skeleton";
 import { Spinner } from "./Spinner";
+import { ProviderCardSkeleton } from "./ProviderCardSkeleton";
 
 describe("Skeleton", () => {
   it("is decorative — the container carries the loading announcement", () => {
@@ -35,5 +36,17 @@ describe("Spinner", () => {
   it("is decorative — the button's own label carries the meaning", () => {
     const { container } = render(<Spinner spinning={true} />);
     expect((container.firstChild as HTMLElement).getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("ProviderCardSkeleton", () => {
+  it("reserves the real text line box on its flex rows", () => {
+    // These rows take their height from their children, so without the
+    // modifier the card grows when data lands — the shift a skeleton exists
+    // to prevent. jsdom can't see the pixels; this guards the wiring the CSS
+    // hangs off.
+    const { container } = render(<ProviderCardSkeleton bars={3} />);
+    expect(container.querySelector(".provider-card__head--skeleton")).not.toBeNull();
+    expect(container.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(3);
   });
 });
