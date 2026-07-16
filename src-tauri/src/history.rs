@@ -30,7 +30,7 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
 
     // Details + cost.
     let mut details: Vec<MonthlyDetail> = buckets.into_values().map(|r| {
-        let pricing = pricing_for(&r.model);
+        let pricing = pricing_for(&r.model, &r.year_month);
         let (total_tokens, cost_usd) = match r.provider {
             ProviderId::Claude => {
                 let total = r.input_tokens + r.output_tokens + r.cache_write_tokens + r.cache_read_tokens;
@@ -117,8 +117,8 @@ mod tests {
         assert_eq!(d.input_tokens, 2_000_000);
         assert_eq!(d.output_tokens, 1_000_000);
         assert_eq!(d.total_tokens, 3_000_000);
-        // 2M input @3 + 1M output @15 = 21.0
-        assert!((d.cost_usd.unwrap() - 21.0).abs() < 1e-9);
+        // sonnet-5 intro promo applies at 2026-07 (<= 2026-08): 2M input @2 + 1M output @10 = 14.0
+        assert!((d.cost_usd.unwrap() - 14.0).abs() < 1e-9);
         assert_eq!(h.summaries.len(), 1);
         assert!(h.summaries[0].cost_estimable);
     }

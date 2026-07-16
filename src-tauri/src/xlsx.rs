@@ -173,17 +173,17 @@ mod tests {
         assert_eq!(text(&r[0][2]), "Model");
         assert_eq!(text(&r[0][9]), "Cost (USD)");
 
-        // Detail row: 1M input @$3 + 1M output @$15 = $18.
+        // Detail row: sonnet-5 intro promo at 2026-07: 1M input @$2 + 1M output @$10 = $12.
         assert_eq!(text(&r[1][0]), "2026-07");
         assert_eq!(text(&r[1][1]), "Claude");
         assert_eq!(text(&r[1][2]), "claude-sonnet-5");
         assert_eq!(num(&r[1][8]), 2_000_000.0);
-        assert!((num(&r[1][9]) - 18.0).abs() < 1e-9);
+        assert!((num(&r[1][9]) - 12.0).abs() < 1e-9);
 
         // Total row closes the (month, provider) group.
         assert_eq!(text(&r[2][2]), "Total");
         assert_eq!(num(&r[2][8]), 2_000_000.0);
-        assert!((num(&r[2][9]) - 18.0).abs() < 1e-9);
+        assert!((num(&r[2][9]) - 12.0).abs() < 1e-9);
         assert_eq!(r.len(), 3);
     }
 
@@ -200,11 +200,11 @@ mod tests {
         let mut wb = open(to_xlsx(&h).unwrap());
         let r = rows(&mut wb, "Usage");
 
-        // Two detail rows, then one total: sonnet $3 + haiku $1 = $4 over 2M tokens.
+        // Two detail rows, then one total: sonnet (intro promo) $2 + haiku $1 = $3 over 2M tokens.
         assert_eq!(r.len(), 4);
         assert_eq!(text(&r[3][2]), "Total");
         assert_eq!(num(&r[3][8]), 2_000_000.0);
-        assert!((num(&r[3][9]) - 4.0).abs() < 1e-9);
+        assert!((num(&r[3][9]) - 3.0).abs() < 1e-9);
     }
 
     #[test]
