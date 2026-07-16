@@ -7,6 +7,13 @@ on:
     tags:
       - 'v*'
 
+# 같은 태그로 실행이 중복 생성되면(GitHub의 이벤트 중복 전달) 여러 Job이
+# 같은 Draft 릴리스에 같은 이름의 자산을 올려 충돌한다.
+# 태그별로 실행을 하나만 남겨 이를 구조적으로 막는다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     permissions:
