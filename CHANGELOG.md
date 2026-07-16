@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-16
+
+macOS 빌드를 추가했습니다.
+
+### Added
+- **macOS 지원** — Windows·Linux에 이어 macOS(Apple Silicon/Intel 유니버설)용 설치 파일(`.dmg`, `.app.tar.gz`)을 릴리스에 추가 (#32)
+
+### Internal
+- 릴리스 워크플로에 `macos-latest` 빌드 매트릭스 추가
+
 ## [1.0.2] - 2026-07-16
 
 비용 추정 정확도를 바로잡고, 로딩 화면의 남은 결함을 마감했습니다.
@@ -119,7 +129,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.1...v1.0.3
 [1.0.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...v1.0.0
 [0.1.2]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...v0.1.2
