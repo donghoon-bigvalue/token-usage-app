@@ -123,11 +123,13 @@ describe("App", () => {
         ? new Promise((res) => { release = res as (r: typeof report) => void; })
         : defaultInvoke(cmd)) as never);
 
-    render(<App />);
+    const { container } = render(<App />);
 
     // Two cards' worth of skeleton, matching the real layout.
     expect(screen.getAllByTestId("provider-skeleton")).toHaveLength(2);
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    // The header now carries its own status role for loading state; scope the assertion to
+    // the cards container to preserve the original intent without false positives.
+    expect(container.querySelector('.app__cards[role="status"]')).not.toBeNull();
 
     release(report);
     await screen.findByText("Max 20x");
