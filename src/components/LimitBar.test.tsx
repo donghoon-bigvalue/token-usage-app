@@ -20,15 +20,15 @@ describe("LimitBar", () => {
     expect(screen.getByText("No data")).toBeInTheDocument();
   });
 
-  it("renders the reset line for both an unavailable window and an available one with a countdown, so bar height never varies", () => {
+  it("fills the reset line with a non-breaking space on both no-countdown paths — a plain space would collapse to 0px and shrink the bar", () => {
     const { container: unavailable } = render(
       wrap(<LimitBar window={{ id: "codex_spark_weekly", used_percent: 0, resets_at: null, available: false }} now={0} locale="en" />)
     );
-    expect(unavailable.querySelector(".limit-bar__reset")).not.toBeNull();
+    expect(unavailable.querySelector(".limit-bar__reset")!.textContent).toBe("\u00A0");
 
     const { container: available } = render(
-      wrap(<LimitBar window={{ id: "claude_session", used_percent: 42, resets_at: 2000, available: true }} now={1000} locale="en" />)
+      wrap(<LimitBar window={{ id: "claude_session", used_percent: 42, resets_at: null, available: true }} now={1000} locale="en" />)
     );
-    expect(available.querySelector(".limit-bar__reset")).not.toBeNull();
+    expect(available.querySelector(".limit-bar__reset")!.textContent).toBe("\u00A0");
   });
 });
