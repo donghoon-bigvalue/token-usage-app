@@ -5,6 +5,7 @@ mod settings;
 mod usage;
 mod commands;
 mod history;
+mod xlsx;
 mod poller;
 
 use tauri::tray::TrayIconBuilder;
@@ -22,7 +23,7 @@ pub fn run() {
             commands::get_settings,
             commands::set_settings,
             commands::get_usage_history,
-            commands::export_usage_csv,
+            commands::export_usage_xlsx,
         ])
         .setup(|app| {
             poller::start(app.handle().clone());

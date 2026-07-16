@@ -7,15 +7,16 @@ export function getUsageHistory(refresh = false): Promise<UsageHistory> {
 }
 
 /**
- * Prompt for a save location and write the usage CSV there.
- * Returns false if the user cancels the dialog.
+ * Prompt for a save location and write the usage workbook there.
+ * Returns false if the user cancels the dialog; rejects if the export fails,
+ * so the caller can show the reason rather than failing silently.
  */
-export async function downloadUsageCsv(): Promise<boolean> {
+export async function downloadUsageXlsx(): Promise<boolean> {
   const path = await save({
-    defaultPath: "token-usage.csv",
-    filters: [{ name: "CSV", extensions: ["csv"] }],
+    defaultPath: "token-usage.xlsx",
+    filters: [{ name: "Excel", extensions: ["xlsx"] }],
   });
   if (!path) return false;
-  await invoke("export_usage_csv", { path });
+  await invoke("export_usage_xlsx", { path });
   return true;
 }

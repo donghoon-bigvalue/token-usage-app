@@ -3,10 +3,10 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import "../i18n";
 
 const getUsageHistory = vi.fn();
-const downloadUsageCsv = vi.fn();
+const downloadUsageXlsx = vi.fn();
 vi.mock("../lib/history", () => ({
   getUsageHistory: (...a: unknown[]) => getUsageHistory(...a),
-  downloadUsageCsv: (...a: unknown[]) => downloadUsageCsv(...a),
+  downloadUsageXlsx: (...a: unknown[]) => downloadUsageXlsx(...a),
 }));
 
 import UsageHistoryView from "./UsageHistoryView";
@@ -22,7 +22,7 @@ const HISTORY = {
 };
 
 describe("UsageHistoryView", () => {
-  beforeEach(() => { getUsageHistory.mockReset(); downloadUsageCsv.mockReset(); });
+  beforeEach(() => { getUsageHistory.mockReset(); downloadUsageXlsx.mockReset(); });
 
   it("renders monthly summary rows", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
@@ -38,24 +38,24 @@ describe("UsageHistoryView", () => {
     expect(screen.getByText("No usage records yet")).toBeTruthy();
   });
 
-  it("calls downloadUsageCsv when the download button is clicked", async () => {
+  it("calls downloadUsageXlsx when the download button is clicked", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
-    downloadUsageCsv.mockResolvedValue(true);
+    downloadUsageXlsx.mockResolvedValue(true);
     render(<UsageHistoryView />);
-    fireEvent.click(await screen.findByText("Download CSV"));
-    await waitFor(() => expect(downloadUsageCsv).toHaveBeenCalled());
+    fireEvent.click(await screen.findByText("Download Excel"));
+    await waitFor(() => expect(downloadUsageXlsx).toHaveBeenCalled());
   });
 
   it("surfaces a failed download instead of swallowing it", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
-    downloadUsageCsv.mockRejectedValue("disk full");
+    downloadUsageXlsx.mockRejectedValue("disk full");
     render(<UsageHistoryView />);
-    fireEvent.click(await screen.findByText("Download CSV"));
+    fireEvent.click(await screen.findByText("Download Excel"));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("disk full");
     // The button must recover so the user can retry.
     await waitFor(() => {
-      expect(screen.getByText<HTMLButtonElement>("Download CSV").closest("button")!.disabled).toBe(false);
+      expect(screen.getByText<HTMLButtonElement>("Download Excel").closest("button")!.disabled).toBe(false);
     });
   });
 
@@ -70,7 +70,7 @@ describe("UsageHistoryView", () => {
   it("has no refresh button of its own — the header owns refresh", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
     render(<UsageHistoryView />);
-    await screen.findByText("Download CSV");
+    await screen.findByText("Download Excel");
     expect(screen.queryByText("Refresh")).toBeNull();
   });
 
@@ -103,7 +103,7 @@ describe("UsageHistoryView", () => {
   it("keeps the last good table when a refresh fails", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
     const { rerender } = render(<UsageHistoryView refreshSignal={0} />);
-    await screen.findByText("Download CSV");
+    await screen.findByText("Download Excel");
 
     getUsageHistory.mockRejectedValue("scan failed");
     rerender(<UsageHistoryView refreshSignal={1} />);

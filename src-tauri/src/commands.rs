@@ -65,7 +65,7 @@ pub async fn get_usage_history(
 }
 
 #[tauri::command]
-pub async fn export_usage_csv(
+pub async fn export_usage_xlsx(
     cache: tauri::State<'_, UsageCache>,
     path: String,
 ) -> Result<(), String> {
@@ -76,6 +76,6 @@ pub async fn export_usage_csv(
             .await
             .map_err(|e| e.to_string())?,
     };
-    let csv = crate::history::to_csv(&history);
-    std::fs::write(&path, csv).map_err(|e| e.to_string())
+    let book = crate::xlsx::to_xlsx(&history).map_err(|e| e.to_string())?;
+    std::fs::write(&path, book).map_err(|e| e.to_string())
 }

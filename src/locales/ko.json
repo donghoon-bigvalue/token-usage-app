@@ -15,7 +15,7 @@
     "thisMonth": "이번 달",
     "tokens": "토큰",
     "cost": "추정 비용",
-    "download": "CSV 다운로드",
+    "download": "Excel 다운로드",
     "downloadFailed": "파일을 저장하지 못했어요",
     "loadFailed": "사용 이력을 불러오지 못했어요",
     "refreshFailed": "새로고침에 실패했어요 — 이전 결과를 보여주는 중",

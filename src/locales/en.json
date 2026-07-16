@@ -15,7 +15,7 @@
     "thisMonth": "This month",
     "tokens": "Tokens",
     "cost": "Est. cost",
-    "download": "Download CSV",
+    "download": "Download Excel",
     "downloadFailed": "Couldn't save the file",
     "loadFailed": "Couldn't load usage history",
     "refreshFailed": "Couldn't refresh — showing the last result",

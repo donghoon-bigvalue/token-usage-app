@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getUsageHistory, downloadUsageCsv } from "../lib/history";
+import { getUsageHistory, downloadUsageXlsx } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
 import { formatTokens, formatUsd } from "../lib/format";
 
@@ -62,7 +62,7 @@ export default function UsageHistoryView({
     setDownloading(true);
     setDownloadError(null);
     try {
-      await downloadUsageCsv();
+      await downloadUsageXlsx();
     } catch (e) {
       setDownloadError(reason(e));
     } finally {

@@ -31,6 +31,8 @@ tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 base64 = "0.22"
 thiserror = "2"
+rust_xlsxwriter = "0.96.0"
 
 [dev-dependencies]
+calamine = "0.36.0"
 tempfile = "3"
