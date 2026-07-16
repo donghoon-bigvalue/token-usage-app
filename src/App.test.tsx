@@ -267,10 +267,14 @@ describe("App", () => {
     const { container } = render(<App />);
     expect(container.querySelector(".app-header .skeleton")).not.toBeNull();
     expect(screen.queryByText(/Updated/)).toBeNull();
+    // The skeleton is aria-hidden, so without this the header would go silent
+    // to assistive tech — worse than the "Updated —" it replaced.
+    expect(container.querySelector('.app-header [role="status"]')).not.toBeNull();
 
     release(report);
     await screen.findByText(`Updated ${hhmmss(10)}`);
     expect(container.querySelector(".app-header .skeleton")).toBeNull();
+    expect(container.querySelector('.app-header [role="status"]')).toBeNull();
   });
 
   it("falls back to a dash — not an endless shimmer — when the first load fails", async () => {

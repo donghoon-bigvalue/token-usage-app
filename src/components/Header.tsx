@@ -42,7 +42,9 @@ export function Header({
       </div>
       <div className="app-header__actions">
         {updatedAt === null && loading ? (
-          <Skeleton width="92px" height={12} radius={4} />
+          <span role="status" aria-label={t("app.loading")}>
+            <Skeleton width="92px" height={12} radius={4} />
+          </span>
         ) : (
           <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
         )}
