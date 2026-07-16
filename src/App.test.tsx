@@ -295,10 +295,19 @@ describe("App", () => {
     const { container } = render(<App />);
     await screen.findByText("Max 20x");
 
+    let reject!: (e: Error) => void;
     vi.mocked(invoke).mockImplementation(((cmd: string) =>
-      cmd === "get_usage_history" ? Promise.reject(new Error("scan boom")) : defaultInvoke(cmd)) as never);
+      cmd === "get_usage_history"
+        ? new Promise((_res, rej) => { reject = rej; })
+        : defaultInvoke(cmd)) as never);
 
     fireEvent.click(screen.getByText("Usage history"));
+
+    // The scan must actually be shimmering mid-flight — not just settle on
+    // the dash by coincidence of onLoadingChange never firing at all.
+    await waitFor(() => expect(container.querySelector(".app-header .skeleton")).not.toBeNull());
+
+    await act(async () => { reject(new Error("scan boom")); });
 
     await screen.findByRole("alert");
 
