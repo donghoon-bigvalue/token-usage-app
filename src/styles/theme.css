@@ -137,3 +137,14 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 .history-download { align-self: flex-start; }
 
 .history-loading { color: var(--muted); font-size: 13px; padding: 12px 0; }
+
+.history-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #D9575780;
+  border-radius: 6px;
+  background: #D9575714;
+  color: #D95757;
+  font-size: 12px;
+  word-break: break-word;
+}

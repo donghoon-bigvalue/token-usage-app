@@ -9,19 +9,23 @@ const ACCENT: Record<"claude" | "codex", string> = {
   codex: "#5162ED",
 };
 
+const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
 export default function UsageHistoryView() {
   const { t } = useTranslation();
   const [history, setHistory] = useState<UsageHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     getUsageHistory()
-      .then((h) => { if (alive) setHistory(h); })
-      .catch(() => { if (alive) setHistory(null); })
+      .then((h) => { if (alive) { setHistory(h); setLoadError(null); } })
+      .catch((e) => { if (alive) setLoadError(reason(e)); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -31,25 +35,38 @@ export default function UsageHistoryView() {
     try {
       const h = await getUsageHistory(true);
       setHistory(h);
-    } catch {
-      // keep showing the last good history on a failed refresh
+      setLoadError(null);
+    } catch (e) {
+      // Keep showing the last good history, but say so rather than going quiet.
+      setLoadError(reason(e));
     } finally {
       setRefreshing(false);
     }
   };
 
+  const onDownload = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadUsageCsv();
+    } catch (e) {
+      setDownloadError(reason(e));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) return <div className="history-loading">…</div>;
+  // A failed load must not masquerade as "no usage yet".
+  if (loadError && !history) {
+    return <div className="history-error" role="alert">{t("history.loadFailed")}: {loadError}</div>;
+  }
   if (!history || history.summaries.length === 0) {
     return <div className="empty-state">{t("history.empty")}</div>;
   }
 
   const current = history.summaries.filter((s) => s.year_month === history.current_month);
   const providers: Array<"claude" | "codex"> = ["claude", "codex"];
-
-  const onDownload = async () => {
-    setDownloading(true);
-    try { await downloadUsageCsv(); } finally { setDownloading(false); }
-  };
 
   return (
     <div className="history-view">
@@ -110,6 +127,13 @@ export default function UsageHistoryView() {
       <button className="history-download" onClick={onDownload} disabled={downloading}>
         {t("history.download")}
       </button>
+
+      {loadError && (
+        <p className="history-error" role="alert">{t("history.refreshFailed")}: {loadError}</p>
+      )}
+      {downloadError && (
+        <p className="history-error" role="alert">{t("history.downloadFailed")}: {downloadError}</p>
+      )}
     </div>
   );
 }
