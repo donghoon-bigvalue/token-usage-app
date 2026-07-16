@@ -1,5 +1,5 @@
 {
-  "app": { "title": "토큰 사용량", "refresh": "새로고침", "settings": "설정", "close": "닫기", "lastUpdated": "{{time}} 갱신", "cached": "캐시됨", "loading": "불러오는 중", "loadFailed": "사용량을 불러오지 못했어요" },
+  "app": { "title": "토큰 사용량", "refresh": "새로고침", "settings": "설정", "close": "닫기", "lastUpdated": "{{time}} 갱신", "cached": "캐시됨", "loading": "불러오는 중", "loadFailed": "사용량을 불러오지 못했어요", "refreshFailed": "새로고침에 실패했어요 — 이전 스냅샷을 보여주는 중" },
   "provider": { "claude": "Claude", "codex": "Codex", "plan": "플랜", "connect": "{{name}} CLI로 로그인하면 사용량이 보여요", "unavailable": "데이터 없음" },
   "window": {
     "claude_session": "현재 세션",

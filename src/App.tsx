@@ -91,6 +91,17 @@ export default function App() {
     }
   }, [view]);
 
+  // Switching to history mounts a child whose loading effect hasn't run yet on
+  // that first render, so historyBusy is still false for one frame — long enough
+  // for the header to flash "Updated —" before the skeleton takes over. Seed the
+  // busy flag optimistically here; the child confirms it (still true) or clears
+  // it in its .finally().
+  const changeView = useCallback((next: "limits" | "history") => {
+    if (next === view) return; // a redundant click on the active tab remounts nothing
+    if (next === "history") setHistoryBusy(true);
+    setView(next);
+  }, [view]);
+
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
     applyTheme(next.theme);
@@ -108,7 +119,7 @@ export default function App() {
         updatedAt={view === "history" ? historyScannedAt : report?.claude.updated_at ?? null}
         locale={locale}
         view={view}
-        onViewChange={setView}
+        onViewChange={changeView}
         refreshing={view === "history" ? historyBusy && refreshPressed : limitsRefreshing}
         loading={view === "history" ? historyBusy : report === null && loadFailed === null}
       />
@@ -117,13 +128,26 @@ export default function App() {
       )}
       {view === "limits" ? (
         report ? (
-          <div className="app__cards">
-            <ProviderCard snapshot={report.claude} now={now} locale={locale} />
-            <ProviderCard snapshot={report.codex} now={now} locale={locale} />
-          </div>
+          <>
+            <div className="app__cards">
+              <ProviderCard snapshot={report.claude} now={now} locale={locale} />
+              <ProviderCard snapshot={report.codex} now={now} locale={locale} />
+            </div>
+            {/* A refresh that fails while a snapshot is already on screen used to
+                vanish: loadFailed was only rendered on the report-less branch
+                below, so the stale cards sat there with no signal. Mirror the
+                History tab and surface it as an alert beneath the cards. */}
+            {loadFailed && (
+              <p className="error-banner" role="alert">{t("app.refreshFailed")}: {loadFailed}</p>
+            )}
+          </>
         ) : loadFailed ? (
           <p className="error-banner" role="alert">{t("app.loadFailed")}: {loadFailed}</p>
         ) : (
+          // bars are the success-case window counts (Claude 3, Codex 2). Known
+          // tradeoff: a provider that resolves to an error renders a shorter
+          // EmptyState, so a cold load ending in an error shifts the layout —
+          // unavoidable here, since the error isn't known until the fetch lands.
           <div className="app__cards" role="status" aria-label={t("app.loading")}>
             <ProviderCardSkeleton bars={3} />
             <ProviderCardSkeleton bars={2} />
