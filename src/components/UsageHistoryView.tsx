@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getUsageHistory, downloadUsageCsv } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
@@ -11,38 +11,52 @@ const ACCENT: Record<"claude" | "codex", string> = {
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export default function UsageHistoryView() {
+/**
+ * `refreshSignal` is bumped by the Header's refresh button — this view has no
+ * refresh control of its own, so there is exactly one refresh affordance per tab.
+ * `onScannedAt` reports the scan time back up so the Header can show it.
+ */
+export default function UsageHistoryView({
+  refreshSignal = 0,
+  onScannedAt,
+}: {
+  refreshSignal?: number;
+  onScannedAt?: (unixSeconds: number) => void;
+}) {
   const { t } = useTranslation();
   const [history, setHistory] = useState<UsageHistory | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+  // App owns the counter and keeps it across tab switches, so a non-zero signal
+  // says nothing on its own — only a *change* since this mount is a refresh.
+  // Comparing against 0 instead would rescan on every tab switch once the user
+  // has hit refresh even once, defeating the backend cache.
+  const seenSignal = useRef(refreshSignal);
+  // Held in a ref so an inline callback from the parent can't re-trigger the
+  // effect — that would rescan on every render.
+  const onScannedAtRef = useRef(onScannedAt);
+  onScannedAtRef.current = onScannedAt;
+
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    getUsageHistory()
-      .then((h) => { if (alive) { setHistory(h); setLoadError(null); } })
+    const isRefresh = refreshSignal !== seenSignal.current;
+    seenSignal.current = refreshSignal;
+    // A refresh keeps the old table on screen; only a cold mount blanks it.
+    if (!isRefresh) setLoading(true);
+    getUsageHistory(isRefresh)
+      .then((h) => {
+        if (!alive) return;
+        setHistory(h);
+        setLoadError(null);
+        onScannedAtRef.current?.(h.scanned_at);
+      })
       .catch((e) => { if (alive) setLoadError(reason(e)); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, []);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const h = await getUsageHistory(true);
-      setHistory(h);
-      setLoadError(null);
-    } catch (e) {
-      // Keep showing the last good history, but say so rather than going quiet.
-      setLoadError(reason(e));
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  }, [refreshSignal]);
 
   const onDownload = async () => {
     setDownloading(true);
@@ -72,9 +86,6 @@ export default function UsageHistoryView() {
     <div className="history-view">
       <section className="history-current">
         <h2>{t("history.thisMonth")}</h2>
-        <button className="history-refresh" onClick={onRefresh} disabled={refreshing}>
-          {t("app.refresh")}
-        </button>
         <div className="history-cards">
           {providers.map((p) => {
             const s = current.find((c) => c.provider === p);

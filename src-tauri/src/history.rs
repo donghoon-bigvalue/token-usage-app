@@ -10,7 +10,9 @@ use crate::pricing::pricing_for;
 
 /// Fold raw records into (month × provider × model) details and (month × provider)
 /// summaries, computing API-equivalent cost per the provider's cache accounting.
-pub fn aggregate(records: Vec<UsageRecord>, current_month: String) -> UsageHistory {
+/// `scanned_at` (unix seconds) is supplied by the caller — this stays a pure fold
+/// so tests stay deterministic.
+pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i64) -> UsageHistory {
     // Sum raw token buckets.
     let mut buckets: BTreeMap<(String, ProviderId, String), UsageRecord> = BTreeMap::new();
     for r in records {
@@ -70,7 +72,7 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String) -> UsageHisto
         .then(prov_key(&a.provider).cmp(&prov_key(&b.provider)))
         .then(a.model.cmp(&b.model)));
 
-    UsageHistory { current_month, summaries, details }
+    UsageHistory { current_month, scanned_at, summaries, details }
 }
 
 /// Minimal RFC-4180 escaping: wrap the field in double quotes (doubling any
@@ -112,8 +114,8 @@ pub fn build_history() -> UsageHistory {
     if let Some(codex_home) = resolve_codex_home() {
         records.extend(crate::providers::codex::scan_usage(&codex_home));
     }
-    let current_month = chrono::Utc::now().format("%Y-%m").to_string();
-    aggregate(records, current_month)
+    let now = chrono::Utc::now();
+    aggregate(records, now.format("%Y-%m").to_string(), now.timestamp())
 }
 
 fn resolve_codex_home() -> Option<PathBuf> {
@@ -139,7 +141,7 @@ mod tests {
             claude_rec("2026-07", "claude-sonnet-5", 1_000_000, 1_000_000, 0, 0),
             claude_rec("2026-07", "claude-sonnet-5", 1_000_000, 0, 0, 0),
         ];
-        let h = aggregate(recs, "2026-07".into());
+        let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         assert_eq!(h.details.len(), 1);
         let d = &h.details[0];
         assert_eq!(d.input_tokens, 2_000_000);
@@ -154,15 +156,23 @@ mod tests {
     #[test]
     fn unknown_model_marks_summary_not_estimable() {
         let recs = vec![claude_rec("2026-07", "weird-model", 1_000_000, 0, 0, 0)];
-        let h = aggregate(recs, "2026-07".into());
+        let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         assert!(h.details[0].cost_usd.is_none());
         assert!(!h.summaries[0].cost_estimable);
     }
 
     #[test]
+    fn aggregate_carries_the_scan_time_through() {
+        // The header shows this, and a cached history keeps serving it — so it
+        // must be the caller's scan time, not "now" at read time.
+        let h = aggregate(vec![claude_rec("2026-07", "claude-sonnet-5", 1, 0, 0, 0)], "2026-07".into(), 1_700_000_000);
+        assert_eq!(h.scanned_at, 1_700_000_000);
+    }
+
+    #[test]
     fn csv_has_header_and_detail_rows() {
         let recs = vec![claude_rec("2026-07", "claude-haiku-4-5", 1_000_000, 0, 0, 0)];
-        let h = aggregate(recs, "2026-07".into());
+        let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         let csv = to_csv(&h);
         let mut lines = csv.lines();
         assert_eq!(lines.next().unwrap(),
@@ -174,7 +184,7 @@ mod tests {
     #[test]
     fn csv_escapes_model_field_with_special_chars() {
         let recs = vec![claude_rec("2026-07", "weird,model\"x", 1_000_000, 0, 0, 0)];
-        let h = aggregate(recs, "2026-07".into());
+        let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         let csv = to_csv(&h);
         let row = csv.lines().nth(1).unwrap();
         // The escaped model field must appear verbatim as its own CSV field:

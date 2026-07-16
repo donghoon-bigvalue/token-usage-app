@@ -111,6 +111,9 @@ pub struct MonthlySummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageHistory {
     pub current_month: String,
+    /// Unix seconds when the logs were scanned. Survives caching, so the header
+    /// can show when this data was actually read rather than when it was served.
+    pub scanned_at: i64,
     pub summaries: Vec<MonthlySummary>,
     pub details: Vec<MonthlyDetail>,
 }

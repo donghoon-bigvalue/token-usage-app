@@ -17,6 +17,12 @@ export default function App() {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<"limits" | "history">("limits");
+  // Bumped to ask UsageHistoryView for a fresh scan; the Header's refresh button
+  // is the single refresh affordance and dispatches by whichever tab is open.
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  // Each tab reports its own freshness: limits carry a snapshot time, history a
+  // scan time, and they move independently.
+  const [historyScannedAt, setHistoryScannedAt] = useState<number | null>(null);
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
@@ -41,7 +47,10 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const refresh = useCallback(() => { fetchUsage().then(applyReport); }, [applyReport]);
+  const refresh = useCallback(() => {
+    if (view === "history") setHistoryRefresh((n) => n + 1);
+    else fetchUsage().then(applyReport);
+  }, [view, applyReport]);
 
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
@@ -57,7 +66,7 @@ export default function App() {
       <Header
         onRefresh={refresh}
         onOpenSettings={() => setShowSettings((v) => !v)}
-        updatedAt={report?.claude.updated_at ?? null}
+        updatedAt={view === "history" ? historyScannedAt : report?.claude.updated_at ?? null}
         locale={locale}
         view={view}
         onViewChange={setView}
@@ -73,7 +82,7 @@ export default function App() {
           </div>
         )
       ) : (
-        <UsageHistoryView />
+        <UsageHistoryView refreshSignal={historyRefresh} onScannedAt={setHistoryScannedAt} />
       )}
     </main>
   );

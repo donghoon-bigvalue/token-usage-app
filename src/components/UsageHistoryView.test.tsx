@@ -13,6 +13,7 @@ import UsageHistoryView from "./UsageHistoryView";
 
 const HISTORY = {
   current_month: "2026-07",
+  scanned_at: 1784192400,
   summaries: [
     { year_month: "2026-07", provider: "claude", total_tokens: 1234567, cost_usd: 12.34, cost_estimable: true },
     { year_month: "2026-07", provider: "codex", total_tokens: 7654321, cost_usd: 5.5, cost_estimable: true },
@@ -31,7 +32,7 @@ describe("UsageHistoryView", () => {
   });
 
   it("shows empty state when no records", async () => {
-    getUsageHistory.mockResolvedValue({ current_month: "2026-07", summaries: [], details: [] });
+    getUsageHistory.mockResolvedValue({ current_month: "2026-07", scanned_at: 1784192400, summaries: [], details: [] });
     render(<UsageHistoryView />);
     await waitFor(() => expect(getUsageHistory).toHaveBeenCalled());
     expect(screen.getByText("No usage records yet")).toBeTruthy();
@@ -66,13 +67,46 @@ describe("UsageHistoryView", () => {
     expect(screen.queryByText("No usage records yet")).toBeNull();
   });
 
-  it("keeps the last good table when a refresh fails", async () => {
+  it("has no refresh button of its own — the header owns refresh", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
     render(<UsageHistoryView />);
     await screen.findByText("Download CSV");
+    expect(screen.queryByText("Refresh")).toBeNull();
+  });
+
+  it("refetches with refresh=true when the header bumps the refresh signal", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} />);
+    await waitFor(() => expect(getUsageHistory).toHaveBeenCalledWith(false));
+
+    rerender(<UsageHistoryView refreshSignal={1} />);
+    await waitFor(() => expect(getUsageHistory).toHaveBeenCalledWith(true));
+    expect(getUsageHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the cache when remounting with a signal left over from an earlier visit", async () => {
+    // Switching tabs unmounts this view, but App keeps the counter. Mounting with
+    // a non-zero signal is a fresh mount, not a refresh — it must not rescan.
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView refreshSignal={3} />);
+    await waitFor(() => expect(getUsageHistory).toHaveBeenCalled());
+    expect(getUsageHistory).toHaveBeenCalledWith(false);
+  });
+
+  it("reports the scan time so the header can show it", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const onScannedAt = vi.fn();
+    render(<UsageHistoryView onScannedAt={onScannedAt} />);
+    await waitFor(() => expect(onScannedAt).toHaveBeenCalledWith(1784192400));
+  });
+
+  it("keeps the last good table when a refresh fails", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} />);
+    await screen.findByText("Download CSV");
 
     getUsageHistory.mockRejectedValue("scan failed");
-    fireEvent.click(screen.getByText("Refresh"));
+    rerender(<UsageHistoryView refreshSignal={1} />);
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("scan failed");

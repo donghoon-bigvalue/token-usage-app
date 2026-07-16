@@ -57,6 +57,8 @@ export interface MonthlyDetail {
 
 export interface UsageHistory {
   current_month: string;
+  /** Unix seconds when the logs were scanned. */
+  scanned_at: number;
   summaries: MonthlySummary[];
   details: MonthlyDetail[];
 }
