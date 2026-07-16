@@ -1042,10 +1042,14 @@ git commit -m "feat(ui): 새로고침 버튼에 진행 스피너 추가 (#23)"
     const { container } = render(<App />);
     expect(container.querySelector(".app-header .skeleton")).not.toBeNull();
     expect(screen.queryByText(/Updated/)).toBeNull();
+    // The skeleton is aria-hidden, so without this the header would go silent
+    // to assistive tech — worse than the "Updated —" it replaced.
+    expect(container.querySelector('.app-header [role="status"]')).not.toBeNull();
 
     release(report);
     await screen.findByText(`Updated ${hhmmss(10)}`);
     expect(container.querySelector(".app-header .skeleton")).toBeNull();
+    expect(container.querySelector('.app-header [role="status"]')).toBeNull();
   });
 
   it("falls back to a dash — not an endless shimmer — when the first load fails", async () => {
@@ -1093,11 +1097,15 @@ props에 `loading` 추가:
 
 ```tsx
         {updatedAt === null && loading ? (
-          <Skeleton width="92px" height={12} radius={4} />
+          <span role="status" aria-label={t("app.loading")}>
+            <Skeleton width="92px" height={12} radius={4} />
+          </span>
         ) : (
           <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
         )}
 ```
+
+> `Skeleton`은 `aria-hidden`이므로 래퍼가 없으면 로딩 중 헤더가 보조기술에 **아무것도** 노출하지 않는다 — 이전엔 최소한 "Updated —"가 읽혔으므로 후퇴다. 스펙 §9의 "컨테이너에만 `role="status"`" 규칙이 여기에도 적용되며, `ProviderCardSkeleton`·`HistorySkeleton`의 소비처가 이미 같은 패턴이다.
 
 - [ ] **Step 4: App에서 loading 계산**
 
