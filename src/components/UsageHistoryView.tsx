@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { getUsageHistory, downloadUsageXlsx } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
 import { formatTokens, formatUsd } from "../lib/format";
+import { HistorySkeleton } from "./HistorySkeleton";
+import { Spinner } from "./Spinner";
 
 const ACCENT: Record<"claude" | "codex", string> = {
   claude: "#D97757",
@@ -19,9 +21,11 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export default function UsageHistoryView({
   refreshSignal = 0,
   onScannedAt,
+  onLoadingChange,
 }: {
   refreshSignal?: number;
   onScannedAt?: (unixSeconds: number) => void;
+  onLoadingChange?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [history, setHistory] = useState<UsageHistory | null>(null);
@@ -39,6 +43,8 @@ export default function UsageHistoryView({
   // effect — that would rescan on every render.
   const onScannedAtRef = useRef(onScannedAt);
   onScannedAtRef.current = onScannedAt;
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  onLoadingChangeRef.current = onLoadingChange;
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +52,7 @@ export default function UsageHistoryView({
     seenSignal.current = refreshSignal;
     // A refresh keeps the old table on screen; only a cold mount blanks it.
     if (!isRefresh) setLoading(true);
+    onLoadingChangeRef.current?.(true);
     getUsageHistory(isRefresh)
       .then((h) => {
         if (!alive) return;
@@ -54,7 +61,16 @@ export default function UsageHistoryView({
         onScannedAtRef.current?.(h.scanned_at);
       })
       .catch((e) => { if (alive) setLoadError(reason(e)); })
-      .finally(() => { if (alive) setLoading(false); });
+      .finally(() => {
+        // Only a live run reports. A superseded run (cleanup already set alive
+        // false) staying silent is what keeps back-to-back refreshes from
+        // stopping the spinner early; App clears the flags when the tab closes,
+        // so a dead mount never speaks for a live one.
+        if (alive) {
+          onLoadingChangeRef.current?.(false);
+          setLoading(false);
+        }
+      });
     return () => { alive = false; };
   }, [refreshSignal]);
 
@@ -70,10 +86,16 @@ export default function UsageHistoryView({
     }
   };
 
-  if (loading) return <div className="history-loading">…</div>;
+  if (loading) {
+    return (
+      <div role="status" aria-label={t("app.loading")}>
+        <HistorySkeleton />
+      </div>
+    );
+  }
   // A failed load must not masquerade as "no usage yet".
   if (loadError && !history) {
-    return <div className="history-error" role="alert">{t("history.loadFailed")}: {loadError}</div>;
+    return <div className="error-banner" role="alert">{t("history.loadFailed")}: {loadError}</div>;
   }
   if (!history || history.summaries.length === 0) {
     return <div className="empty-state">{t("history.empty")}</div>;
@@ -135,15 +157,16 @@ export default function UsageHistoryView({
         </tbody>
       </table>
 
-      <button className="history-download" onClick={onDownload} disabled={downloading}>
-        {t("history.download")}
+      <button className="history-download" onClick={onDownload} disabled={downloading} aria-busy={downloading}>
+        <Spinner spinning={downloading} idle="↓" />
+        <span>{t("history.download")}</span>
       </button>
 
       {loadError && (
-        <p className="history-error" role="alert">{t("history.refreshFailed")}: {loadError}</p>
+        <p className="error-banner" role="alert">{t("history.refreshFailed")}: {loadError}</p>
       )}
       {downloadError && (
-        <p className="history-error" role="alert">{t("history.downloadFailed")}: {downloadError}</p>
+        <p className="error-banner" role="alert">{t("history.downloadFailed")}: {downloadError}</p>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import "../i18n";
 
 const getUsageHistory = vi.fn();
@@ -112,5 +112,111 @@ describe("UsageHistoryView", () => {
     expect(alert.textContent).toContain("scan failed");
     // Table survives — a failed refresh must not blank out the view.
     expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0);
+  });
+
+  it("shows a table-shaped skeleton on a cold load, not an ellipsis", async () => {
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+
+    render(<UsageHistoryView />);
+
+    expect(screen.getByTestId("history-skeleton")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText("…")).toBeNull();
+
+    release(HISTORY);
+    await screen.findByText("Download Excel");
+    expect(screen.queryByTestId("history-skeleton")).toBeNull();
+  });
+
+  it("keeps the table on screen during a refresh instead of falling back to the skeleton", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} />);
+    await screen.findByText("Download Excel");
+
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+    rerender(<UsageHistoryView refreshSignal={1} />);
+
+    // Data the user has already read must not revert to grey blocks.
+    expect(screen.queryByTestId("history-skeleton")).toBeNull();
+    expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0);
+
+    release(HISTORY);
+    await waitFor(() => expect(getUsageHistory).toHaveBeenCalledTimes(2));
+  });
+
+  it("reports load progress for both cold loads and refreshes", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const onLoadingChange = vi.fn();
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} onLoadingChange={onLoadingChange} />);
+
+    await waitFor(() => expect(onLoadingChange).toHaveBeenLastCalledWith(false));
+    expect(onLoadingChange.mock.calls.map((c) => c[0])).toEqual([true, false]);
+
+    rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
+    await waitFor(() => expect(onLoadingChange.mock.calls.map((c) => c[0])).toEqual([true, false, true, false]));
+  });
+
+  it("reports progress as finished when a scan fails, so the caller can stop spinning", async () => {
+    getUsageHistory.mockRejectedValue("scan failed");
+    const onLoadingChange = vi.fn();
+    render(<UsageHistoryView onLoadingChange={onLoadingChange} />);
+
+    await screen.findByRole("alert");
+    expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("keeps reporting busy when a superseded scan resolves after a newer one started", async () => {
+    let releaseFirst!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseFirst = res; }));
+    const onLoadingChange = vi.fn();
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} onLoadingChange={onLoadingChange} />);
+
+    // A second scan starts while the first is still in flight.
+    let releaseSecond!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseSecond = res; }));
+    rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
+
+    // Drain the stale scan's whole .then/.catch/.finally chain before asserting,
+    // so the assertion tests the guard rather than microtask timing.
+    await act(async () => { releaseFirst(HISTORY); });
+    // The stale scan must not clear the flag — scan two is still running.
+    expect(onLoadingChange).toHaveBeenLastCalledWith(true);
+
+    await act(async () => { releaseSecond(HISTORY); });
+    expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("goes silent after unmount — a dead scan must not speak for a live one", async () => {
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+    const onLoadingChange = vi.fn();
+    const { unmount } = render(<UsageHistoryView onLoadingChange={onLoadingChange} />);
+    await waitFor(() => expect(onLoadingChange).toHaveBeenCalledWith(true));
+
+    // The user switches tabs mid-scan; App owns the flag and clears it itself.
+    unmount();
+    onLoadingChange.mockClear();
+    await act(async () => { release(HISTORY); });
+
+    expect(onLoadingChange).not.toHaveBeenCalled();
+  });
+
+  it("marks the download button busy while the export runs", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    let release!: () => void;
+    downloadUsageXlsx.mockReturnValue(new Promise<void>((res) => { release = res; }));
+
+    render(<UsageHistoryView />);
+    const label = await screen.findByText("Download Excel");
+    const button = label.closest("button")!;
+    expect(button.getAttribute("aria-busy")).toBe("false");
+
+    fireEvent.click(label);
+    await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("true"));
+
+    release();
+    await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("false"));
   });
 });

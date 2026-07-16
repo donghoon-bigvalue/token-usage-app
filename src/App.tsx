@@ -6,14 +6,16 @@ import { applyTheme } from "./theme";
 import type { UsageReport, Settings } from "./lib/types";
 import { Header } from "./components/Header";
 import { ProviderCard } from "./components/ProviderCard";
+import { ProviderCardSkeleton } from "./components/ProviderCardSkeleton";
 import { SettingsPanel } from "./components/SettingsPanel";
 import UsageHistoryView from "./components/UsageHistoryView";
 import "./styles/theme.css";
 
 export default function App() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [report, setReport] = useState<UsageReport | null>(null);
   const [settings, setSettingsState] = useState<Settings | null>(null);
+  const [loadFailed, setLoadFailed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [showSettings, setShowSettings] = useState(false);
   const [view, setView] = useState<"limits" | "history">("limits");
@@ -23,11 +25,25 @@ export default function App() {
   // Each tab reports its own freshness: limits carry a snapshot time, history a
   // scan time, and they move independently.
   const [historyScannedAt, setHistoryScannedAt] = useState<number | null>(null);
+  const [limitsRefreshing, setLimitsRefreshing] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  // Only a press should spin the button; a cold load shows a skeleton instead.
+  const [refreshPressed, setRefreshPressed] = useState(false);
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
     setReport((prev) => mergeReport(prev, next));
   }, []);
+
+  // The one place limits are fetched — a rejection here used to vanish, leaving
+  // the card area blank forever. Now it resolves the loading state instead.
+  const load = useCallback(
+    () =>
+      fetchUsage()
+        .then((r) => { applyReport(r); setLoadFailed(null); })
+        .catch((e) => setLoadFailed(e instanceof Error ? e.message : String(e))),
+    [applyReport]
+  );
 
   // 초기 로드
   useEffect(() => {
@@ -36,10 +52,10 @@ export default function App() {
       applyTheme(s.theme);
       i18n.changeLanguage(s.language);
     });
-    fetchUsage().then(applyReport);
+    load();
     const un = onUsageUpdated(applyReport);
     return () => { un.then((f) => f()); };
-  }, [i18n, applyReport]);
+  }, [i18n, applyReport, load]);
 
   // 카운트다운 틱
   useEffect(() => {
@@ -48,9 +64,32 @@ export default function App() {
   }, []);
 
   const refresh = useCallback(() => {
-    if (view === "history") setHistoryRefresh((n) => n + 1);
-    else fetchUsage().then(applyReport);
-  }, [view, applyReport]);
+    if (view === "history") {
+      setRefreshPressed(true);
+      setHistoryRefresh((n) => n + 1);
+    } else {
+      setLimitsRefreshing(true);
+      load().finally(() => setLimitsRefreshing(false));
+    }
+  }, [view, load]);
+
+  // Fires for cold loads too — App decides what it means. Task 5 reuses
+  // historyBusy for the header's time placeholder.
+  const handleHistoryLoading = useCallback((busy: boolean) => {
+    setHistoryBusy(busy);
+    if (!busy) setRefreshPressed(false);
+  }, []);
+
+  // Leaving the history tab unmounts the view mid-scan, and these flags are
+  // ours, not its — without this a press abandoned by a tab switch stays
+  // pending and spins the button on the next cold load, which the user never
+  // pressed.
+  useEffect(() => {
+    if (view !== "history") {
+      setHistoryBusy(false);
+      setRefreshPressed(false);
+    }
+  }, [view]);
 
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
@@ -70,19 +109,32 @@ export default function App() {
         locale={locale}
         view={view}
         onViewChange={setView}
+        refreshing={view === "history" ? historyBusy && refreshPressed : limitsRefreshing}
+        loading={view === "history" ? historyBusy : report === null && loadFailed === null}
       />
       {showSettings && settings && (
         <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />
       )}
       {view === "limits" ? (
-        report && (
+        report ? (
           <div className="app__cards">
             <ProviderCard snapshot={report.claude} now={now} locale={locale} />
             <ProviderCard snapshot={report.codex} now={now} locale={locale} />
           </div>
+        ) : loadFailed ? (
+          <p className="error-banner" role="alert">{t("app.loadFailed")}: {loadFailed}</p>
+        ) : (
+          <div className="app__cards" role="status" aria-label={t("app.loading")}>
+            <ProviderCardSkeleton bars={3} />
+            <ProviderCardSkeleton bars={2} />
+          </div>
         )
       ) : (
-        <UsageHistoryView refreshSignal={historyRefresh} onScannedAt={setHistoryScannedAt} />
+        <UsageHistoryView
+          refreshSignal={historyRefresh}
+          onScannedAt={setHistoryScannedAt}
+          onLoadingChange={handleHistoryLoading}
+        />
       )}
     </main>
   );
