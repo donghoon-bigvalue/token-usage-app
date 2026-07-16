@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import { Skeleton } from "./Skeleton";
 import { Spinner } from "./Spinner";
 import { ProviderCardSkeleton } from "./ProviderCardSkeleton";
+import { HistorySkeleton } from "./HistorySkeleton";
 
 describe("Skeleton", () => {
   it("is decorative — the container carries the loading announcement", () => {
@@ -48,5 +49,27 @@ describe("ProviderCardSkeleton", () => {
     const { container } = render(<ProviderCardSkeleton bars={3} />);
     expect(container.querySelector(".provider-card__head--skeleton")).not.toBeNull();
     expect(container.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(3);
+  });
+});
+
+describe("HistorySkeleton", () => {
+  it("reserves a download-button placeholder, since the real button is otherwise absent", () => {
+    // The skeleton previously had no counterpart for `.history-download` at
+    // all, so the button's height (plus the gap before it) appeared out of
+    // nowhere when data landed. This asserts the placeholder exists.
+    const { container } = render(<HistorySkeleton />);
+    expect(container.querySelector(".history-download--skeleton")).not.toBeNull();
+  });
+
+  it("reserves the real text line box on its title, note, and card rows", () => {
+    // Same wiring as ProviderCardSkeleton: these containers take their height
+    // from children, so without the modifiers the view grows when the bare
+    // skeleton blocks are replaced by real text's taller line box.
+    const { container } = render(<HistorySkeleton />);
+    expect(container.querySelector(".history-title--skeleton")).not.toBeNull();
+    expect(container.querySelector(".history-note--skeleton")).not.toBeNull();
+    expect(container.querySelectorAll(".history-card-title--skeleton")).toHaveLength(2);
+    expect(container.querySelectorAll(".history-card-tokens--skeleton")).toHaveLength(2);
+    expect(container.querySelectorAll(".history-card-cost--skeleton")).toHaveLength(2);
   });
 });

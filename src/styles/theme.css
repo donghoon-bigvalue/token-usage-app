@@ -182,6 +182,19 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 .provider-card__head--skeleton { height: 22px; }
 .limit-bar__row--skeleton { height: 18px; }
 
+/* Same cause here: `.history-current`, `.history-cards`, and `.history-card`
+   take their height from children, so a bare skeleton block (sized to the
+   font-size) is shorter than the real text's line box (13px/15px/18px font
+   render as 18px/20px/24px line boxes), and the download button has no
+   skeleton counterpart at all — together these are what grew `.history-view`
+   by 87px when data landed. */
+.history-title--skeleton { height: 20px; margin-bottom: 8px; }
+.history-card-title--skeleton { height: 18px; }
+.history-card-tokens--skeleton { height: 18px; }
+.history-card-cost--skeleton { height: 24px; }
+.history-note--skeleton { height: 17px; }
+.history-download--skeleton { height: 25px; align-self: flex-start; }
+
 /* Motion here is the whole point (a static block reads as "frozen"), but a
    reader who asked for no motion gets the static block anyway. */
 @media (prefers-reduced-motion: reduce) {
