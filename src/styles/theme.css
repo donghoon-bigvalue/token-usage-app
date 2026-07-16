@@ -143,8 +143,6 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 
 .history-download { align-self: flex-start; }
 
-.history-loading { color: var(--muted); font-size: 13px; padding: 12px 0; }
-
 .history-error {
   margin-top: 8px;
   padding: 8px 10px;
@@ -154,4 +152,30 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
   color: #D95757;
   font-size: 12px;
   word-break: break-word;
+}
+
+/* Loading — cold loads get a skeleton, in-flight refreshes get a button spinner.
+   Both are built from --track/--card so light and dark follow for free. */
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--track) 25%, var(--card) 50%, var(--track) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.6s linear infinite;
+}
+@keyframes skeleton-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.spinner { display: inline-block; margin-right: 4px; }
+.spinner--on { animation: spinner-rotate .8s linear infinite; }
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* Motion here is the whole point (a static block reads as "frozen"), but a
+   reader who asked for no motion gets the static block anyway. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background: var(--track); }
+  .spinner--on { animation: none; }
 }
