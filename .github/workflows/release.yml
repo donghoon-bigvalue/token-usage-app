@@ -26,6 +26,8 @@ jobs:
             args: ''
           - platform: 'ubuntu-22.04'
             args: ''
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -56,6 +58,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -91,6 +95,7 @@ jobs:
             echo "아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요."
             echo ""
             echo "- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일"
+            echo "- **macOS**: \`.dmg\` 또는 \`.app.tar.gz\`"
             echo "- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`"
             echo ""
             echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
