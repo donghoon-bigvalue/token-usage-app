@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import "../i18n";
 
 const getUsageHistory = vi.fn();
@@ -178,12 +178,28 @@ describe("UsageHistoryView", () => {
     getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseSecond = res; }));
     rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
 
-    releaseFirst(HISTORY);
-    await waitFor(() => expect(onLoadingChange.mock.calls.length).toBeGreaterThanOrEqual(2));
+    // Drain the stale scan's whole .then/.catch/.finally chain before asserting,
+    // so the assertion tests the guard rather than microtask timing.
+    await act(async () => { releaseFirst(HISTORY); });
     // The stale scan must not clear the flag — scan two is still running.
     expect(onLoadingChange).toHaveBeenLastCalledWith(true);
 
-    releaseSecond(HISTORY);
-    await waitFor(() => expect(onLoadingChange).toHaveBeenLastCalledWith(false));
+    await act(async () => { releaseSecond(HISTORY); });
+    expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("goes silent after unmount — a dead scan must not speak for a live one", async () => {
+    let release!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValue(new Promise((res) => { release = res; }));
+    const onLoadingChange = vi.fn();
+    const { unmount } = render(<UsageHistoryView onLoadingChange={onLoadingChange} />);
+    await waitFor(() => expect(onLoadingChange).toHaveBeenCalledWith(true));
+
+    // The user switches tabs mid-scan; App owns the flag and clears it itself.
+    unmount();
+    onLoadingChange.mockClear();
+    await act(async () => { release(HISTORY); });
+
+    expect(onLoadingChange).not.toHaveBeenCalled();
   });
 });

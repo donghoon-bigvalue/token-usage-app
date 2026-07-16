@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import "./i18n";
 import type { UsageReport, Settings } from "./lib/types";
 
@@ -218,5 +218,42 @@ describe("App", () => {
 
     release(history);
     await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+  });
+
+  it("abandons a history refresh when the user leaves the tab mid-scan", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+    fireEvent.click(screen.getByText("Usage history"));
+    await waitFor(() => expect(invoked("get_usage_history")).toHaveLength(1));
+
+    // Press refresh, then walk away before the scan finishes.
+    let releaseStale!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { releaseStale = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("true"));
+
+    fireEvent.click(screen.getByText("Limits"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+
+    // Coming back is a cold load the user never asked for — the abandoned press
+    // must not spin the button for it.
+    let releaseFresh!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { releaseFresh = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+    fireEvent.click(screen.getByText("Usage history"));
+    await screen.findByTestId("history-skeleton");
+    expect(refreshButton().getAttribute("aria-busy")).toBe("false");
+
+    // The abandoned scan landing late must not stop the live one either.
+    await act(async () => { releaseStale(history); });
+    expect(screen.getByTestId("history-skeleton")).toBeInTheDocument();
+
+    await act(async () => { releaseFresh(history); });
+    await waitFor(() => expect(screen.queryByTestId("history-skeleton")).toBeNull());
   });
 });

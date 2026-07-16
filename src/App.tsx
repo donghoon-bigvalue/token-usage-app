@@ -80,6 +80,17 @@ export default function App() {
     if (!busy) setRefreshPressed(false);
   }, []);
 
+  // Leaving the history tab unmounts the view mid-scan, and these flags are
+  // ours, not its — without this a press abandoned by a tab switch stays
+  // pending and spins the button on the next cold load, which the user never
+  // pressed.
+  useEffect(() => {
+    if (view !== "history") {
+      setHistoryBusy(false);
+      setRefreshPressed(false);
+    }
+  }, [view]);
+
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
     applyTheme(next.theme);

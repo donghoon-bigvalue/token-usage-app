@@ -44,13 +44,9 @@ export default function UsageHistoryView({
   onScannedAtRef.current = onScannedAt;
   const onLoadingChangeRef = useRef(onLoadingChange);
   onLoadingChangeRef.current = onLoadingChange;
-  // Identifies the newest scan, so a superseded one resolving late can't clear
-  // the parent's busy flag out from under the scan still running.
-  const loadSeq = useRef(0);
 
   useEffect(() => {
     let alive = true;
-    const seq = ++loadSeq.current;
     const isRefresh = refreshSignal !== seenSignal.current;
     seenSignal.current = refreshSignal;
     // A refresh keeps the old table on screen; only a cold mount blanks it.
@@ -65,11 +61,14 @@ export default function UsageHistoryView({
       })
       .catch((e) => { if (alive) setLoadError(reason(e)); })
       .finally(() => {
-        // Reported even after unmount — the parent owns this flag and would
-        // otherwise spin forever if the user switched tabs mid-scan. Gated on
-        // seq so back-to-back refreshes don't stop the spinner early.
-        if (seq === loadSeq.current) onLoadingChangeRef.current?.(false);
-        if (alive) setLoading(false);
+        // Only a live run reports. A superseded run (cleanup already set alive
+        // false) staying silent is what keeps back-to-back refreshes from
+        // stopping the spinner early; App clears the flags when the tab closes,
+        // so a dead mount never speaks for a live one.
+        if (alive) {
+          onLoadingChangeRef.current?.(false);
+          setLoading(false);
+        }
       });
     return () => { alive = false; };
   }, [refreshSignal]);
