@@ -20,25 +20,32 @@ const history = {
 };
 const hhmmss = (unix: number) => new Date(unix * 1000).toLocaleTimeString("en-US");
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn((cmd: string) => {
-    if (cmd === "get_usage") return Promise.resolve(report);
-    if (cmd === "get_settings") return Promise.resolve(settings);
-    if (cmd === "set_settings") return Promise.resolve(settings);
-    if (cmd === "get_usage_history") return Promise.resolve(history);
-    return Promise.resolve(null);
-  }),
-}));
+// The mock factory is hoisted above the fixtures, so it can't close over them —
+// the implementation is installed per-test in beforeEach instead. That also
+// keeps a failure injected by one test from leaking into the next, which
+// clearAllMocks does not prevent (it clears calls, not implementations).
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn(() => Promise.resolve(null)) }));
 
 import App from "./App";
 import { invoke } from "@tauri-apps/api/core";
 
+function defaultInvoke(cmd: string) {
+  if (cmd === "get_usage") return Promise.resolve(report);
+  if (cmd === "get_settings") return Promise.resolve(settings);
+  if (cmd === "set_settings") return Promise.resolve(settings);
+  if (cmd === "get_usage_history") return Promise.resolve(history);
+  return Promise.resolve(null);
+}
+
 const invoked = (cmd: string) => vi.mocked(invoke).mock.calls.filter((c) => c[0] === cmd);
 
 describe("App", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockImplementation(defaultInvoke as never);
+  });
   it("renders both provider cards with plans", async () => {
     render(<App />);
     await waitFor(() => {
