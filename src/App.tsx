@@ -110,6 +110,7 @@ export default function App() {
         view={view}
         onViewChange={setView}
         refreshing={view === "history" ? historyBusy && refreshPressed : limitsRefreshing}
+        loading={view === "history" ? historyBusy : report === null && loadFailed === null}
       />
       {showSettings && settings && (
         <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />

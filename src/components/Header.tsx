@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Spinner } from "./Spinner";
+import { Skeleton } from "./Skeleton";
 
 export function Header({
   onRefresh,
@@ -9,6 +10,7 @@ export function Header({
   view,
   onViewChange,
   refreshing,
+  loading,
 }: {
   onRefresh: () => void;
   onOpenSettings: () => void;
@@ -17,6 +19,7 @@ export function Header({
   view: "limits" | "history";
   onViewChange: (v: "limits" | "history") => void;
   refreshing: boolean;
+  loading: boolean;
 }) {
   const { t } = useTranslation();
   const timeStr = updatedAt
@@ -38,7 +41,11 @@ export function Header({
         </div>
       </div>
       <div className="app-header__actions">
-        <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
+        {updatedAt === null && loading ? (
+          <Skeleton width="92px" height={12} radius={4} />
+        ) : (
+          <span className="app-header__updated">{t("app.lastUpdated", { time: timeStr })}</span>
+        )}
         <button onClick={onRefresh} aria-busy={refreshing}>
           <Spinner spinning={refreshing} />
           <span>{t("app.refresh")}</span>

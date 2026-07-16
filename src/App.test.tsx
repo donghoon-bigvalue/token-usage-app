@@ -256,4 +256,32 @@ describe("App", () => {
     await act(async () => { releaseFresh(history); });
     await waitFor(() => expect(screen.queryByTestId("history-skeleton")).toBeNull());
   });
+
+  it("shimmers the header time while the first load is in flight", async () => {
+    let release!: (r: typeof report) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage"
+        ? new Promise((res) => { release = res as (r: typeof report) => void; })
+        : defaultInvoke(cmd)) as never);
+
+    const { container } = render(<App />);
+    expect(container.querySelector(".app-header .skeleton")).not.toBeNull();
+    expect(screen.queryByText(/Updated/)).toBeNull();
+
+    release(report);
+    await screen.findByText(`Updated ${hhmmss(10)}`);
+    expect(container.querySelector(".app-header .skeleton")).toBeNull();
+  });
+
+  it("falls back to a dash — not an endless shimmer — when the first load fails", async () => {
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage" ? Promise.reject(new Error("boom")) : defaultInvoke(cmd)) as never);
+
+    const { container } = render(<App />);
+    await screen.findByRole("alert");
+
+    // A dash is honest here: no time is coming.
+    expect(screen.getByText("Updated —")).toBeInTheDocument();
+    expect(container.querySelector(".app-header .skeleton")).toBeNull();
+  });
 });
