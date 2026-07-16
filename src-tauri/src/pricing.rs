@@ -108,4 +108,58 @@ mod tests {
     fn unknown_model_has_no_pricing() {
         assert!(pricing_for("mystery-model-9", "2026-07").is_none());
     }
+
+    #[test]
+    fn opus_legacy_keeps_15_75() {
+        let p = pricing_for("claude-opus-4-1", "2026-07").unwrap();
+        assert_eq!((p.input, p.output, p.cache_write, p.cache_read), (15.0, 75.0, 18.75, 1.5));
+    }
+
+    #[test]
+    fn opus_current_gen_is_5_25() {
+        let p = pricing_for("claude-opus-4-8", "2026-07").unwrap();
+        assert_eq!((p.input, p.output, p.cache_write, p.cache_read), (5.0, 25.0, 6.25, 0.50));
+    }
+
+    #[test]
+    fn fable_is_10_50() {
+        let p = pricing_for("claude-fable-5", "2026-07").unwrap();
+        assert_eq!((p.input, p.output, p.cache_write, p.cache_read), (10.0, 50.0, 12.5, 1.0));
+    }
+
+    #[test]
+    fn sonnet5_intro_promo_before_september() {
+        let p = pricing_for("claude-sonnet-5", "2026-07").unwrap();
+        assert_eq!((p.input, p.output), (2.0, 10.0));
+    }
+
+    #[test]
+    fn sonnet5_promo_includes_august_2026() {
+        let p = pricing_for("claude-sonnet-5", "2026-08").unwrap();
+        assert_eq!((p.input, p.output), (2.0, 10.0));
+    }
+
+    #[test]
+    fn sonnet5_standard_rate_after_promo() {
+        let p = pricing_for("claude-sonnet-5", "2026-09").unwrap();
+        assert_eq!((p.input, p.output), (3.0, 15.0));
+    }
+
+    #[test]
+    fn legacy_sonnet_never_gets_promo() {
+        let p = pricing_for("claude-sonnet-4-6", "2026-07").unwrap();
+        assert_eq!((p.input, p.output), (3.0, 15.0));
+    }
+
+    #[test]
+    fn gpt_53_codex_is_1_75_14() {
+        let p = pricing_for("gpt-5.3-codex", "2026-07").unwrap();
+        assert_eq!((p.input, p.output, p.cached_input), (1.75, 14.0, 0.175));
+    }
+
+    #[test]
+    fn gpt_53_codex_spark_matches_codex() {
+        let p = pricing_for("gpt-5.3-codex-spark", "2026-07").unwrap();
+        assert_eq!((p.input, p.output, p.cached_input), (1.75, 14.0, 0.175));
+    }
 }
