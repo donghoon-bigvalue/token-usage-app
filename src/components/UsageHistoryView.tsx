@@ -158,7 +158,7 @@ export default function UsageHistoryView({
       </table>
 
       <button className="history-download" onClick={onDownload} disabled={downloading} aria-busy={downloading}>
-        <Spinner spinning={downloading} idle="⬇" />
+        <Spinner spinning={downloading} idle="↓" />
         <span>{t("history.download")}</span>
       </button>
 
