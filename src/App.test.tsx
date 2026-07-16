@@ -291,6 +291,37 @@ describe("App", () => {
     expect(container.querySelector(".app-header .skeleton")).toBeNull();
   });
 
+  it("surfaces a limits refresh failure without hiding the last snapshot", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage" ? Promise.reject(new Error("refresh boom")) : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Refresh"));
+
+    // A failed refresh used to vanish: loadFailed only rendered on the
+    // report-less branch, so the stale cards sat there with no signal.
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("refresh boom");
+    // The snapshot the user was reading must stay on screen.
+    expect(screen.getByText("Max 20x")).toBeInTheDocument();
+  });
+
+  it("clears the limits refresh banner once a later refresh succeeds", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage" ? Promise.reject(new Error("refresh boom")) : defaultInvoke(cmd)) as never);
+    fireEvent.click(screen.getByText("Refresh"));
+    await screen.findByRole("alert");
+
+    vi.mocked(invoke).mockImplementation(defaultInvoke as never);
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
   it("falls back to a dash on the history tab too, when the scan fails — historyBusy must still clear via .finally()", async () => {
     const { container } = render(<App />);
     await screen.findByText("Max 20x");

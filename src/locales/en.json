@@ -1,5 +1,5 @@
 {
-  "app": { "title": "Token Usage", "refresh": "Refresh", "settings": "Settings", "close": "Close", "lastUpdated": "Updated {{time}}", "cached": "cached", "loading": "Loading", "loadFailed": "Couldn't load usage" },
+  "app": { "title": "Token Usage", "refresh": "Refresh", "settings": "Settings", "close": "Close", "lastUpdated": "Updated {{time}}", "cached": "cached", "loading": "Loading", "loadFailed": "Couldn't load usage", "refreshFailed": "Couldn't refresh — showing the last snapshot" },
   "provider": { "claude": "Claude", "codex": "Codex", "plan": "Plan", "connect": "Sign in with the {{name}} CLI to see usage", "unavailable": "No data" },
   "window": {
     "claude_session": "Current session",
