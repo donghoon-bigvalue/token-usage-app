@@ -20,9 +20,11 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export default function UsageHistoryView({
   refreshSignal = 0,
   onScannedAt,
+  onLoadingChange,
 }: {
   refreshSignal?: number;
   onScannedAt?: (unixSeconds: number) => void;
+  onLoadingChange?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [history, setHistory] = useState<UsageHistory | null>(null);
@@ -40,13 +42,20 @@ export default function UsageHistoryView({
   // effect — that would rescan on every render.
   const onScannedAtRef = useRef(onScannedAt);
   onScannedAtRef.current = onScannedAt;
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  onLoadingChangeRef.current = onLoadingChange;
+  // Identifies the newest scan, so a superseded one resolving late can't clear
+  // the parent's busy flag out from under the scan still running.
+  const loadSeq = useRef(0);
 
   useEffect(() => {
     let alive = true;
+    const seq = ++loadSeq.current;
     const isRefresh = refreshSignal !== seenSignal.current;
     seenSignal.current = refreshSignal;
     // A refresh keeps the old table on screen; only a cold mount blanks it.
     if (!isRefresh) setLoading(true);
+    onLoadingChangeRef.current?.(true);
     getUsageHistory(isRefresh)
       .then((h) => {
         if (!alive) return;
@@ -55,7 +64,13 @@ export default function UsageHistoryView({
         onScannedAtRef.current?.(h.scanned_at);
       })
       .catch((e) => { if (alive) setLoadError(reason(e)); })
-      .finally(() => { if (alive) setLoading(false); });
+      .finally(() => {
+        // Reported even after unmount — the parent owns this flag and would
+        // otherwise spin forever if the user switched tabs mid-scan. Gated on
+        // seq so back-to-back refreshes don't stop the spinner early.
+        if (seq === loadSeq.current) onLoadingChangeRef.current?.(false);
+        if (alive) setLoading(false);
+      });
     return () => { alive = false; };
   }, [refreshSignal]);
 

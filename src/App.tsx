@@ -25,6 +25,10 @@ export default function App() {
   // Each tab reports its own freshness: limits carry a snapshot time, history a
   // scan time, and they move independently.
   const [historyScannedAt, setHistoryScannedAt] = useState<number | null>(null);
+  const [limitsRefreshing, setLimitsRefreshing] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  // Only a press should spin the button; a cold load shows a skeleton instead.
+  const [refreshPressed, setRefreshPressed] = useState(false);
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
@@ -60,9 +64,21 @@ export default function App() {
   }, []);
 
   const refresh = useCallback(() => {
-    if (view === "history") setHistoryRefresh((n) => n + 1);
-    else load();
+    if (view === "history") {
+      setRefreshPressed(true);
+      setHistoryRefresh((n) => n + 1);
+    } else {
+      setLimitsRefreshing(true);
+      load().finally(() => setLimitsRefreshing(false));
+    }
   }, [view, load]);
+
+  // Fires for cold loads too — App decides what it means. Task 5 reuses
+  // historyBusy for the header's time placeholder.
+  const handleHistoryLoading = useCallback((busy: boolean) => {
+    setHistoryBusy(busy);
+    if (!busy) setRefreshPressed(false);
+  }, []);
 
   const changeSettings = useCallback((next: Settings) => {
     setSettingsState(next);
@@ -82,6 +98,7 @@ export default function App() {
         locale={locale}
         view={view}
         onViewChange={setView}
+        refreshing={view === "history" ? historyBusy && refreshPressed : limitsRefreshing}
       />
       {showSettings && settings && (
         <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />
@@ -101,7 +118,11 @@ export default function App() {
           </div>
         )
       ) : (
-        <UsageHistoryView refreshSignal={historyRefresh} onScannedAt={setHistoryScannedAt} />
+        <UsageHistoryView
+          refreshSignal={historyRefresh}
+          onScannedAt={setHistoryScannedAt}
+          onLoadingChange={handleHistoryLoading}
+        />
       )}
     </main>
   );

@@ -146,4 +146,77 @@ describe("App", () => {
     // screen it replaced.
     expect(screen.queryByTestId("provider-skeleton")).toBeNull();
   });
+
+  const refreshButton = () => screen.getByText("Refresh").closest("button")!;
+
+  it("marks the refresh button busy while a limits refresh is in flight", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+    expect(refreshButton().getAttribute("aria-busy")).toBe("false");
+
+    let release!: (r: typeof report) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage"
+        ? new Promise((res) => { release = res as (r: typeof report) => void; })
+        : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("true"));
+    // The cards stay — a refresh must not blank what the user is reading.
+    expect(screen.getByText("Max 20x")).toBeInTheDocument();
+
+    release(report);
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+  });
+
+  it("stops the refresh button spinning when a limits refresh fails", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage" ? Promise.reject(new Error("boom")) : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+  });
+
+  it("does not spin the refresh button on a history cold load — the user never pressed it", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+
+    let release!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { release = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Usage history"));
+
+    // The skeleton already says "loading" — a button the user never pressed
+    // must not respond.
+    await screen.findByTestId("history-skeleton");
+    expect(refreshButton().getAttribute("aria-busy")).toBe("false");
+
+    release(history);
+    await waitFor(() => expect(screen.queryByTestId("history-skeleton")).toBeNull());
+  });
+
+  it("spins the refresh button when the user refreshes the history tab", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+    fireEvent.click(screen.getByText("Usage history"));
+    await waitFor(() => expect(invoked("get_usage_history")).toHaveLength(1));
+
+    let release!: (h: typeof history) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage_history"
+        ? new Promise((res) => { release = res as (h: typeof history) => void; })
+        : defaultInvoke(cmd)) as never);
+
+    fireEvent.click(screen.getByText("Refresh"));
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("true"));
+
+    release(history);
+    await waitFor(() => expect(refreshButton().getAttribute("aria-busy")).toBe("false"));
+  });
 });

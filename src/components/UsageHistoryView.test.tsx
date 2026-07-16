@@ -145,4 +145,45 @@ describe("UsageHistoryView", () => {
     release(HISTORY);
     await waitFor(() => expect(getUsageHistory).toHaveBeenCalledTimes(2));
   });
+
+  it("reports load progress for both cold loads and refreshes", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const onLoadingChange = vi.fn();
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} onLoadingChange={onLoadingChange} />);
+
+    await waitFor(() => expect(onLoadingChange).toHaveBeenLastCalledWith(false));
+    expect(onLoadingChange.mock.calls.map((c) => c[0])).toEqual([true, false]);
+
+    rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
+    await waitFor(() => expect(onLoadingChange.mock.calls.map((c) => c[0])).toEqual([true, false, true, false]));
+  });
+
+  it("reports progress as finished when a scan fails, so the caller can stop spinning", async () => {
+    getUsageHistory.mockRejectedValue("scan failed");
+    const onLoadingChange = vi.fn();
+    render(<UsageHistoryView onLoadingChange={onLoadingChange} />);
+
+    await screen.findByRole("alert");
+    expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("keeps reporting busy when a superseded scan resolves after a newer one started", async () => {
+    let releaseFirst!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseFirst = res; }));
+    const onLoadingChange = vi.fn();
+    const { rerender } = render(<UsageHistoryView refreshSignal={0} onLoadingChange={onLoadingChange} />);
+
+    // A second scan starts while the first is still in flight.
+    let releaseSecond!: (h: typeof HISTORY) => void;
+    getUsageHistory.mockReturnValueOnce(new Promise((res) => { releaseSecond = res; }));
+    rerender(<UsageHistoryView refreshSignal={1} onLoadingChange={onLoadingChange} />);
+
+    releaseFirst(HISTORY);
+    await waitFor(() => expect(onLoadingChange.mock.calls.length).toBeGreaterThanOrEqual(2));
+    // The stale scan must not clear the flag — scan two is still running.
+    expect(onLoadingChange).toHaveBeenLastCalledWith(true);
+
+    releaseSecond(HISTORY);
+    await waitFor(() => expect(onLoadingChange).toHaveBeenLastCalledWith(false));
+  });
 });
