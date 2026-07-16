@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-16
+
+로딩 화면을 다듬고, 로딩이 끝나지 않을 때 앱이 침묵하던 문제를 고쳤습니다.
+
+### Changed
+- **로딩 표시를 스켈레톤·스피너로 교체** — `…` 글자나 빈 화면 대신, 실제 카드·표와 같은 모양의 자리표시자가 부드럽게 반짝입니다
+  - 콜드 로드 → 스켈레톤 / 새로고침 → 기존 내용을 유지한 채 버튼 아이콘 회전
+  - 데이터가 도착해도 화면이 튀지 않도록 자리표시자가 실제 크기를 미리 확보합니다
+  - 라이트·다크 테마 자동 대응, 시스템의 "동작 줄이기" 설정 존중
+- 헤더의 갱신 시각이 불러오는 중일 때만 반짝이고, 시각이 없는 경우엔 그대로 `—`로 표시됩니다
+- Excel 다운로드 버튼에 진행 표시가 생겼습니다
+
+### Fixed
+- **한도를 불러오지 못하면 아무 안내 없이 빈 화면이던 문제** — 실패 사유를 표시합니다
+- 리셋 시각이 없는 한도 항목(예: Codex Spark)에서 카드 높이가 어긋나던 문제
+- 사용 이력 탭에서 새로고침 도중 탭을 옮기면 진행 표시가 잘못 남던 문제
+
+### Internal
+- 릴리스 워크플로에 태그별 concurrency 그룹 추가 — 같은 태그로 워크플로가 중복 실행되어 자산 업로드가 충돌하는 것을 방지 (#21)
+- GitHub에 남아 있던 `.omc` 툴링 상태 파일 추적 해제 (#22)
+
 ## [1.0.0] - 2026-07-16
 
 월별 토큰 사용량·비용 추정 기능을 더한 첫 정식 릴리스입니다.
@@ -83,7 +104,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...v1.0.0
 [0.1.2]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.0...v0.1.1
