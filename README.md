@@ -16,6 +16,7 @@ Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데
 | 플랫폼 | 파일 | 설치 방법 |
 | --- | --- | --- |
 | **Windows** | `token-usage-app_<버전>_x64_en-US.msi` 또는 `..._x64-setup.exe` | 내려받아 실행 후 안내를 따릅니다. |
+| **macOS (Intel·Apple Silicon 공용)** | `token-usage-app_<버전>_universal.dmg` | 열어서 앱을 `Applications` 폴더로 끌어다 놓습니다. (1.0.3 버전부터 제공) |
 | **Linux (범용)** | `token-usage-app_<버전>_amd64.AppImage` | 실행 권한을 주고 바로 실행합니다. |
 | **Linux (Debian·Ubuntu)** | `token-usage-app_<버전>_amd64.deb` | `sudo dpkg -i <파일>` 또는 `sudo apt install ./<파일>` |
 | **Linux (Fedora·RHEL)** | `token-usage-app-<버전>-1.x86_64.rpm` | `sudo rpm -i <파일>` 또는 `sudo dnf install ./<파일>` |
@@ -28,6 +29,12 @@ chmod +x token-usage-app_*_amd64.AppImage
 ```
 
 > **Windows 참고** — 코드 서명이 적용돼 있지 않아 첫 실행 시 SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 눌러 진행하세요.
+>
+> **macOS 참고** — 코드 서명·공증(notarization)이 적용돼 있지 않아 첫 실행 시 *"확인되지 않은 개발자"* 경고가 뜹니다. 앱을 **우클릭(또는 Control-클릭) → 열기**로 실행하면 진행할 수 있습니다. 그래도 *"손상되었기 때문에 열 수 없습니다"* 라고 나오면, 터미널에서 격리 속성을 제거하세요:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/token-usage-app.app
+> ```
 
 소스에서 직접 빌드하려면 아래 개발자 안내를 참고하세요.
 
