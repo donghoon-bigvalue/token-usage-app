@@ -8,6 +8,7 @@ mod history;
 mod xlsx;
 mod poller;
 
+use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager, WindowEvent};
 
@@ -24,21 +25,51 @@ pub fn run() {
             commands::set_settings,
             commands::get_usage_history,
             commands::export_usage_xlsx,
+            commands::show_main,
+            commands::toggle_widget,
         ])
         .setup(|app| {
             poller::start(app.handle().clone());
 
-            let mut tray = TrayIconBuilder::new().on_tray_icon_event(|tray, event| {
-                if let tauri::tray::TrayIconEvent::Click { .. } = event {
-                    if let Some(win) = tray.app_handle().get_webview_window("main") {
-                        let _ = if win.is_visible().unwrap_or(false) {
-                            win.hide()
-                        } else {
-                            win.show().and_then(|_| win.set_focus())
-                        };
+            let show_main_i = MenuItem::with_id(app, "show_main", "메인 창 열기", true, None::<&str>)?;
+            let toggle_widget_i =
+                MenuItem::with_id(app, "toggle_widget", "위젯 표시/숨기기", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_main_i, &toggle_widget_i, &quit_i])?;
+
+            let mut tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show_main" => {
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
                     }
-                }
-            });
+                    "toggle_widget" => {
+                        if let Some(win) = app.get_webview_window("widget") {
+                            let _ = if win.is_visible().unwrap_or(false) {
+                                win.hide()
+                            } else {
+                                win.show().and_then(|_| win.set_focus())
+                            };
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                        if let Some(win) = tray.app_handle().get_webview_window("main") {
+                            let _ = if win.is_visible().unwrap_or(false) {
+                                win.hide()
+                            } else {
+                                win.show().and_then(|_| win.set_focus())
+                            };
+                        }
+                    }
+                });
             // Only set the icon if one is bundled; a missing icon shouldn't
             // panic app startup.
             if let Some(icon) = app.default_window_icon() {

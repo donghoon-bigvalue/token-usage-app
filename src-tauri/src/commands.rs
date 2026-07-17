@@ -2,6 +2,7 @@ use crate::model::UsageHistory;
 use crate::settings::{sanitize, Settings};
 use crate::usage::{self, UsageReport};
 use tauri::AppHandle;
+use tauri::Manager;
 use tauri_plugin_store::StoreExt;
 
 const STORE_FILE: &str = "settings.json";
@@ -78,4 +79,28 @@ pub async fn export_usage_xlsx(
     };
     let book = crate::xlsx::to_xlsx(&history).map_err(|e| e.to_string())?;
     std::fs::write(&path, book).map_err(|e| e.to_string())
+}
+
+/// Bring the main window back to the foreground — the widget calls this when
+/// its body is clicked so a click on the mini view reopens the full app.
+#[tauri::command]
+pub fn show_main(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+/// Show or hide the always-on-top widget window. The window is created hidden
+/// at startup and only toggled here — never destroyed — so its on-screen
+/// position is retained across hide/show for free.
+#[tauri::command]
+pub fn toggle_widget(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("widget") {
+        let _ = if win.is_visible().unwrap_or(false) {
+            win.hide()
+        } else {
+            win.show().and_then(|_| win.set_focus())
+        };
+    }
 }
