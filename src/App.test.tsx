@@ -54,6 +54,13 @@ describe("App", () => {
     });
   });
 
+  it("toggles the widget window from the header button", async () => {
+    render(<App />);
+    await screen.findByText("Max 20x");
+    fireEvent.click(screen.getByLabelText("Widget"));
+    expect(invoked("toggle_widget")).toHaveLength(1);
+  });
+
   it("header refresh rescans usage history while the history tab is open", async () => {
     render(<App />);
     await screen.findByText("Max 20x");

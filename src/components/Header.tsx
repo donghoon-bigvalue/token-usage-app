@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import { Spinner } from "./Spinner";
 import { Skeleton } from "./Skeleton";
 
@@ -53,6 +54,7 @@ export function Header({
           <span>{t("app.refresh")}</span>
         </button>
         <button onClick={onOpenSettings} aria-label={t("app.settings")}>⚙</button>
+        <button onClick={() => invoke("toggle_widget")} aria-label={t("app.widget")}>▭</button>
       </div>
     </header>
   );
