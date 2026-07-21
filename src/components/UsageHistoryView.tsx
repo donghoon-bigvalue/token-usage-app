@@ -117,8 +117,13 @@ export default function UsageHistoryView({
                   {t(`provider.${p}`)}
                 </span>
                 <span className="history-card-tokens">
-                  {formatTokens(s?.total_tokens ?? 0)} {t("history.tokens")}
+                  {formatTokens(s?.direct_tokens ?? 0)} {t("history.tokens")}
                 </span>
+                {s && s.total_tokens > s.direct_tokens && (
+                  <span className="history-card-cached">
+                    {t("history.withCache", { total: formatTokens(s.total_tokens) })}
+                  </span>
+                )}
                 <span className="history-card-cost">
                   {formatUsd(s ? s.cost_usd : 0)}
                   {s && !s.cost_estimable && (
@@ -132,6 +137,7 @@ export default function UsageHistoryView({
       </section>
 
       <p className="history-note">{t("history.estimateNote")}</p>
+      <p className="history-note">{t("history.cacheNote")}</p>
 
       <table className="history-table">
         <thead>

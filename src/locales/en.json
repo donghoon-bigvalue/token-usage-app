@@ -24,7 +24,15 @@
     "notEstimable": "some model prices unlisted",
     "colMonth": "Month",
     "colProvider": "Service",
-    "colTokens": "Tokens",
-    "colCost": "Est. cost ($)"
+    "colTokens": "Direct tokens",
+    "colCost": "Est. cost ($)",
+    "withCache": "{{total}} incl. cache",
+    "cacheNote": "Direct use = input + output. Cache reads pile up because every turn re-reads the conversation context, so they grow with conversation length",
+    "bucketInput": "Input",
+    "bucketOutput": "Output",
+    "bucketCacheRead": "Cache read",
+    "bucketCacheWrite": "Cache write",
+    "bucketTotal": "Total",
+    "expandRow": "Show breakdown"
   }
 }

@@ -15,8 +15,20 @@ const HISTORY = {
   current_month: "2026-07",
   scanned_at: 1784192400,
   summaries: [
-    { year_month: "2026-07", provider: "claude", total_tokens: 1234567, cost_usd: 12.34, cost_estimable: true },
-    { year_month: "2026-07", provider: "codex", total_tokens: 7654321, cost_usd: 5.5, cost_estimable: true },
+    {
+      year_month: "2026-07", provider: "claude",
+      input_tokens: 1_000_000, output_tokens: 234_567,
+      cache_read_tokens: 9_000_000, cache_write_tokens: 500_000,
+      direct_tokens: 1_234_567, total_tokens: 10_734_567,
+      cost_usd: 12.34, cost_estimable: true,
+    },
+    {
+      year_month: "2026-07", provider: "codex",
+      input_tokens: 7_000_000, output_tokens: 654_321,
+      cache_read_tokens: 0, cache_write_tokens: 0,
+      direct_tokens: 7_654_321, total_tokens: 7_654_321,
+      cost_usd: 5.5, cost_estimable: true,
+    },
   ],
   details: [],
 };
@@ -29,6 +41,22 @@ describe("UsageHistoryView", () => {
     render(<UsageHistoryView />);
     await waitFor(() => expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0));
     expect(screen.getAllByText("2026-07").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("leads with direct tokens and keeps the cache-inclusive total as a subline", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView />);
+    // The headline is what the user spent, not the cache-dominated total.
+    expect(await screen.findByText(/1,234,567/)).toBeTruthy();
+    expect(screen.getByText(/10,734,567 incl\. cache/)).toBeTruthy();
+  });
+
+  it("omits the cache subline when a provider has no cache traffic", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView />);
+    await screen.findByText(/1,234,567/);
+    // Codex here has total === direct; repeating the number would just be noise.
+    expect(screen.queryByText(/7,654,321 incl\. cache/)).toBeNull();
   });
 
   it("shows empty state when no records", async () => {

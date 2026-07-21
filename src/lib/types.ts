@@ -37,6 +37,17 @@ export interface Settings {
 export interface MonthlySummary {
   year_month: string;
   provider: "claude" | "codex";
+  /**
+   * Display-normalized buckets — these four always sum to `total_tokens`.
+   * For Codex, `input_tokens` has its cached reads stripped out and
+   * `cache_read_tokens` comes from the raw `cached_input_tokens`.
+   */
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  /** `input_tokens + output_tokens` — the headline number. */
+  direct_tokens: number;
   total_tokens: number;
   cost_usd: number | null;
   cost_estimable: boolean;
@@ -46,11 +57,13 @@ export interface MonthlyDetail {
   year_month: string;
   provider: "claude" | "codex";
   model: string;
-  input_tokens: number;
-  output_tokens: number;
-  cache_write_tokens: number;
-  cache_read_tokens: number;
-  cached_input_tokens: number;
+  /** Log-verbatim buckets. For Codex, `raw_input_tokens` includes cache reads. */
+  raw_input_tokens: number;
+  raw_output_tokens: number;
+  raw_cache_write_tokens: number;
+  raw_cache_read_tokens: number;
+  raw_cached_input_tokens: number;
+  direct_tokens: number;
   total_tokens: number;
   cost_usd: number | null;
 }
