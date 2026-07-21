@@ -15,9 +15,15 @@ const report: UsageReport = {
 };
 
 const hide = vi.fn();
+const setSize = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }));
-vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ hide }) }));
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ hide, setSize }) }));
+vi.mock("@tauri-apps/api/dpi", () => ({
+  LogicalSize: class {
+    constructor(public width: number, public height: number) {}
+  },
+}));
 
 import "../i18n";
 import { WidgetApp } from "./WidgetApp";
@@ -29,6 +35,7 @@ describe("WidgetApp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hide.mockClear();
+    setSize.mockClear();
     vi.mocked(invoke).mockImplementation(((cmd: string) =>
       cmd === "get_usage" ? Promise.resolve(report) : Promise.resolve(null)) as never);
   });
@@ -60,5 +67,22 @@ describe("WidgetApp", () => {
     await waitFor(() => expect(screen.getAllByTestId("bar-fill")).toHaveLength(5));
     fireEvent.click(screen.getByLabelText("Close"));
     expect(hide).toHaveBeenCalledTimes(1);
+  });
+
+  it("resizes the window to fit its measured content height (no internal scroll)", async () => {
+    // jsdom has no layout, so stub the card's measured height; the widget should
+    // set the window height to exactly that, keeping the fixed 260 width.
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 382, width: 260 } as DOMRect);
+    try {
+      render(<WidgetApp locale="en" />);
+      await waitFor(() => expect(setSize).toHaveBeenCalled());
+      const calls = setSize.mock.calls;
+      const size = calls[calls.length - 1][0] as { width: number; height: number };
+      expect(size.width).toBe(260);
+      expect(size.height).toBe(382);
+    } finally {
+      rect.mockRestore();
+    }
   });
 });

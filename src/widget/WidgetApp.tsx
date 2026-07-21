@@ -1,9 +1,35 @@
+import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import { useUsageReport } from "../lib/useUsageReport";
 import { LimitBar } from "../components/LimitBar";
 import type { UsageSnapshot } from "../lib/types";
+
+// The window keeps a fixed width; only its height tracks the content so the
+// widget never needs an internal scrollbar — a scrollbar in a widget is the
+// exact friction we're removing.
+const WIDGET_WIDTH = 260;
+
+/// Resize the window to exactly fit the card. Runs after every render (no dep
+/// array) so it re-fits when the bar count changes (error/loading states, or a
+/// provider gaining an `unavailable` window) — not just on mount. Guarded on a
+/// real, changed height so the countdown's per-second re-render doesn't spam
+/// the IPC bridge. In jsdom there is no layout (height 0), so this is a no-op
+/// under test.
+function useFitWindowHeight(ref: React.RefObject<HTMLElement | null>) {
+  const lastHeight = useRef(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const height = Math.ceil(el.getBoundingClientRect().height);
+    if (height > 0 && height !== lastHeight.current) {
+      lastHeight.current = height;
+      getCurrentWindow().setSize(new LogicalSize(WIDGET_WIDTH, height));
+    }
+  });
+}
 
 function WidgetGroup({ snapshot, now, locale }: { snapshot: UsageSnapshot; now: number; locale: "en" | "ko" }) {
   const { t } = useTranslation();
@@ -23,9 +49,11 @@ function WidgetGroup({ snapshot, now, locale }: { snapshot: UsageSnapshot; now: 
 export function WidgetApp({ locale }: { locale: "en" | "ko" }) {
   const { t } = useTranslation();
   const { report, loadFailed, now, reload } = useUsageReport();
+  const rootRef = useRef<HTMLDivElement>(null);
+  useFitWindowHeight(rootRef);
 
   return (
-    <div className="widget">
+    <div className="widget" ref={rootRef}>
       <div className="widget__bar" data-tauri-drag-region>
         <span className="widget__title" data-tauri-drag-region>{t("app.title")}</span>
         <button className="widget__btn" aria-label={t("app.refresh")}

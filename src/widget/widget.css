@@ -3,10 +3,12 @@
 html, body { background: transparent; margin: 0; }
 #root { -webkit-user-select: none; user-select: none; }
 
+/* Height is intentionally auto: the card grows to its content and the window
+   is resized to match (see useFitWindowHeight), so the widget never scrolls
+   internally. */
 .widget {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   box-sizing: border-box;
   background: var(--card);
   border: 1px solid var(--border);
@@ -29,7 +31,7 @@ html, body { background: transparent; margin: 0; }
   cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 6px;
 }
 .widget__btn:hover { background: var(--card); }
-.widget__body { flex: 1; overflow-y: auto; padding: 8px 10px; cursor: pointer; }
+.widget__body { padding: 8px 10px; cursor: pointer; }
 .widget-group { margin-bottom: 8px; }
 .widget-group__name { font-size: 11px; font-weight: 700; margin: 0 0 4px; color: var(--accent); }
 .widget-group__error { font-size: 11px; opacity: 0.6; margin: 0 0 6px; }

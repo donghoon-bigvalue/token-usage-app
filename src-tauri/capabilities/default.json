@@ -11,6 +11,7 @@
     "core:window:allow-is-visible",
     "core:window:allow-set-always-on-top",
     "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
     "core:event:allow-listen",
     "store:default",
     "notification:default",
