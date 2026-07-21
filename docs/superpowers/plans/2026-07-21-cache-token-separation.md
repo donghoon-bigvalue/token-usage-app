@@ -425,8 +425,8 @@ const KO: Labels = Labels {
 /// grand total, in column order.
 fn token_cells(d: &MonthlyDetail) -> [u64; 7] {
     [
-        d.input_tokens, d.output_tokens, d.cache_write_tokens,
-        d.cache_read_tokens, d.cached_input_tokens, d.direct_tokens, d.total_tokens,
+        d.raw_input_tokens, d.raw_output_tokens, d.raw_cache_write_tokens,
+        d.raw_cache_read_tokens, d.raw_cached_input_tokens, d.direct_tokens, d.total_tokens,
     ]
 }
 ```
@@ -515,11 +515,29 @@ export interface MonthlySummary {
 }
 ```
 
-`MonthlyDetail`에는 `cached_input_tokens` 다음에 한 줄 추가:
+`MonthlyDetail`의 원시 버킷 5개는 `raw_` 접두어를 쓰고 `direct_tokens`가 추가된다 (Task 1에서
+Rust 쪽 이름이 이렇게 정해졌다 — Detail은 로그 원본, Summary는 정규화라는 규칙을 이름으로
+구분한다):
 
 ```ts
+export interface MonthlyDetail {
+  year_month: string;
+  provider: "claude" | "codex";
+  model: string;
+  /** Log-verbatim buckets. For Codex, `raw_input_tokens` includes cache reads. */
+  raw_input_tokens: number;
+  raw_output_tokens: number;
+  raw_cache_write_tokens: number;
+  raw_cache_read_tokens: number;
+  raw_cached_input_tokens: number;
   direct_tokens: number;
+  total_tokens: number;
+  cost_usd: number | null;
+}
 ```
+
+`MonthlyDetail`을 참조하는 다른 프런트 코드가 있으면 함께 고친다:
+`grep -rn "cached_input_tokens\|cache_write_tokens" src/` 로 확인할 것.
 
 - [ ] **Step 2: i18n 키를 추가한다**
 
