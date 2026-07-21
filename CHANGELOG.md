@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-07-21
+
+메인 창을 열지 않아도 사용량을 확인할 수 있는 미니 위젯 창을 추가했습니다.
+
+### Added
+- **미니 위젯 창** — 프레임리스·투명·항상 위 미니 창으로 Claude·Codex의 한도 막대와 리셋 카운트다운을 상시 표시 (#36)
+  - 트레이 우클릭 메뉴 또는 메인 헤더의 위젯 버튼으로 표시·숨기기
+  - 상단 바를 잡아 이동, 본문 클릭 시 메인 창 열기, 새로고침·닫기 버튼
+  - 창 높이가 콘텐츠에 맞춰 자동 조정되어 내부 스크롤 없음
+  - 메인 창과 동일한 테마·언어 설정을 따르고, 새로고침 중에는 아이콘이 회전
+- **MIT 라이선스** — `LICENSE` 파일과 README 라이선스 안내, 패키지 메타데이터에 `license` 필드 추가 (#37)
+
+### Internal
+- 위젯 전용 Vite 진입점(`widget.html`)과 `useUsageReport` 훅 추가 — 메인 창과 동일한 사용량 이벤트를 공유
+- 트레이 좌클릭 처리를 좌버튼으로 한정해 새로 추가된 우클릭 메뉴와의 충돌 방지
+
 ## [1.0.3] - 2026-07-16
 
 macOS 빌드를 추가했습니다.
@@ -129,7 +145,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.1...v1.0.3
 [1.0.1]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v0.1.2...v1.0.0
