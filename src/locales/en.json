@@ -32,7 +32,6 @@
     "bucketOutput": "Output",
     "bucketCacheRead": "Cache read",
     "bucketCacheWrite": "Cache write",
-    "bucketTotal": "Total",
-    "expandRow": "Show breakdown"
+    "bucketTotal": "Total"
   }
 }

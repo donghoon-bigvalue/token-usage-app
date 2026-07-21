@@ -32,7 +32,6 @@
     "bucketOutput": "출력",
     "bucketCacheRead": "캐시 읽기",
     "bucketCacheWrite": "캐시 쓰기",
-    "bucketTotal": "총합",
-    "expandRow": "상세 보기"
+    "bucketTotal": "총합"
   }
 }

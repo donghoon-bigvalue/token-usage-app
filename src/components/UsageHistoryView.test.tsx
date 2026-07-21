@@ -62,6 +62,22 @@ describe("UsageHistoryView", () => {
     expect(screen.queryByText(/7,654,321 incl\. cache/)).toBeNull();
   });
 
+  it("pins the monthly table cell to direct_tokens, not the cache-inclusive total", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { container } = render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+
+    // Column header: pins the label so a copy change doesn't drift unnoticed.
+    expect(screen.getByRole("columnheader", { name: "Direct tokens" })).toBeInTheDocument();
+
+    // The precise regression this branch exists to prevent: if the cell
+    // reverted to `formatTokens(s.total_tokens)`, the claude row would read
+    // "10,734,567" (total_tokens) instead of "1,234,567" (direct_tokens).
+    const firstRow = container.querySelectorAll(".history-table tbody tr")[0];
+    const tokenCell = firstRow.querySelectorAll("td")[2];
+    expect(tokenCell.textContent).toBe("1,234,567");
+  });
+
   it("shows empty state when no records", async () => {
     getUsageHistory.mockResolvedValue({ current_month: "2026-07", scanned_at: 1784192400, summaries: [], details: [] });
     render(<UsageHistoryView />);
@@ -242,7 +258,10 @@ describe("UsageHistoryView", () => {
     await screen.findByText("Download Excel");
     expect(screen.queryByText("Cache read")).toBeNull();
 
-    const toggles = screen.getAllByRole("button", { name: "Show breakdown" });
+    // The toggle's accessible name is now its visible content — the glyph is
+    // aria-hidden, so the name is the month, not a generic "Show breakdown"
+    // that would leave every row indistinguishable to a screen reader.
+    const toggles = screen.getAllByRole("button", { name: "2026-07" });
     expect(toggles[0].getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(toggles[0]);
 
@@ -256,7 +275,7 @@ describe("UsageHistoryView", () => {
     render(<UsageHistoryView />);
     await screen.findByText("Download Excel");
     // Second row is Codex, whose cache buckets are both zero.
-    const toggles = screen.getAllByRole("button", { name: "Show breakdown" });
+    const toggles = screen.getAllByRole("button", { name: "2026-07" });
     fireEvent.click(toggles[1]);
     expect(screen.queryByText("Cache write")).toBeNull();
     expect(screen.getByText("Input")).toBeTruthy();

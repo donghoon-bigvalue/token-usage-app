@@ -22,7 +22,13 @@ struct DisplayBuckets {
 
 impl DisplayBuckets {
     fn direct(&self) -> u64 {
-        self.input + self.output
+        Self::direct_of(self.input, self.output)
+    }
+
+    /// Same rule as `direct()`, for callers that only have the accumulated
+    /// input/output (the summary fold below) rather than a whole `DisplayBuckets`.
+    fn direct_of(input: u64, output: u64) -> u64 {
+        input + output
     }
 }
 
@@ -132,7 +138,7 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         year_month: ym, provider: p,
         input_tokens: a.input, output_tokens: a.output,
         cache_read_tokens: a.cache_read, cache_write_tokens: a.cache_write,
-        direct_tokens: a.input + a.output,
+        direct_tokens: DisplayBuckets::direct_of(a.input, a.output),
         total_tokens: a.total, cost_usd: Some(a.cost), cost_estimable: a.estimable,
     }).collect();
 

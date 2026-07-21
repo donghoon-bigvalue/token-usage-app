@@ -177,7 +177,6 @@ export default function UsageHistoryView({
                       type="button"
                       className="history-expand"
                       aria-expanded={open}
-                      aria-label={t("history.expandRow")}
                       onClick={() => toggleRow(key)}
                     >
                       <span aria-hidden="true">{open ? "▾" : "▸"}</span> {s.year_month}

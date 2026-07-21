@@ -2,8 +2,8 @@ import { Skeleton } from "./Skeleton";
 
 /**
  * Mirrors UsageHistoryView's loaded shape: the "this month" heading and two
- * cards, the estimate note, table rows, then the download button. Five rows
- * is a plausible history — enough to read as a table, few enough not to
+ * cards, both estimate/cache notes, table rows, then the download button. Five
+ * rows is a plausible history — enough to read as a table, few enough not to
  * overstate what's coming; the table's own height still shifts when real
  * rows land, since the row count can't be known before the scan returns.
  * Everything else is wrapped in a `history-skeleton__*` class — a namespace
@@ -11,6 +11,12 @@ import { Skeleton } from "./Skeleton";
  * co-occur with the real element's base class the way `ProviderCardSkeleton`'s
  * modifiers do — that reserves the real element's line-box height, so only
  * the table moves.
+ *
+ * The cache subline (`.history-card-cached`) only renders when a provider's
+ * total exceeds its direct tokens, so a Claude card is one line taller than a
+ * Codex one at runtime. Reserving that line unconditionally here matches the
+ * common case (a cache-using account) without teaching the skeleton the
+ * `total_tokens > direct_tokens` logic that decides it for real.
  */
 export function HistorySkeleton() {
   return (
@@ -28,6 +34,9 @@ export function HistorySkeleton() {
               <div className="history-skeleton__card-tokens">
                 <Skeleton width="88px" height={13} radius={4} />
               </div>
+              <div className="history-skeleton__card-cached">
+                <Skeleton width="76px" height={11} radius={4} />
+              </div>
               <div className="history-skeleton__card-cost">
                 <Skeleton width="72px" height={18} radius={4} />
               </div>
@@ -37,6 +46,9 @@ export function HistorySkeleton() {
       </section>
       <div className="history-skeleton__note">
         <Skeleton width="70%" height={12} radius={4} />
+      </div>
+      <div className="history-skeleton__note">
+        <Skeleton width="90%" height={12} radius={4} />
       </div>
       <div className="history-skeleton__rows">
         {Array.from({ length: 5 }, (_, i) => (

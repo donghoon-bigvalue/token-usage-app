@@ -210,6 +210,11 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 .history-skeleton__title { height: 20px; margin-bottom: 8px; }
 .history-skeleton__card-title { height: 18px; }
 .history-skeleton__card-tokens { height: 18px; }
+/* .history-card-cached is 11px text (15px line box) and only renders when a
+   provider's total exceeds its direct tokens — reserved unconditionally here
+   since a cache-using account (the common case) is one line taller than one
+   without. */
+.history-skeleton__card-cached { height: 15px; }
 .history-skeleton__card-cost { height: 24px; }
 .history-skeleton__note { height: 17px; }
 .history-skeleton__download { height: 25px; align-self: flex-start; }
