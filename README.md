@@ -116,3 +116,7 @@ npm run test:watch # 워치 모드
 ## 권장 IDE 설정
 
 [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+## 라이선스
+
+이 프로젝트는 [MIT License](LICENSE)로 배포됩니다.
