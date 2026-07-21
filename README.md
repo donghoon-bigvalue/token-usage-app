@@ -9,6 +9,34 @@ Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데
 
 스택: React + TypeScript + Vite (프런트엔드) / Rust + Tauri v2 (백엔드)
 
+## 화면
+
+![메인 창 — Claude·Codex 한도 막대](docs/images/main-dark.png)
+
+한도 확인 → 월별 사용량 → 테마·언어 전환 → 미니 위젯까지, 실제 사용 흐름입니다.
+
+![사용 흐름 투어](docs/images/tour.gif)
+
+<details>
+<summary>화면 더 보기 — 미니 위젯 · 사용 이력 · 설정</summary>
+
+**미니 위젯** — 항상 위에 떠 있는 작은 창. 본문을 클릭하면 메인 창이 열립니다.
+
+![미니 위젯 창](docs/images/widget.png)
+
+**사용 이력** — 월별 토큰 사용량과 API 요율 기준 추정 비용. Excel로 내려받을 수 있습니다.
+
+![월별 사용량과 추정 비용](docs/images/history.png)
+
+**설정** — 언어, 테마, 자동 새로고침 주기.
+
+![설정 패널](docs/images/settings.png)
+
+</details>
+
+> 위 이미지는 데모용 예시 데이터로 만든 것이라, 실제 화면의 숫자와는 다릅니다.
+> 다시 만들려면 `npm run screenshots` — 자세한 내용은 [개발자 안내](#스크린샷-다시-만들기)를 보세요.
+
 ## 다운로드 및 설치
 
 최신 설치 파일은 **[GitHub Releases](https://github.com/donghoon-bigvalue/token-usage-app/releases/latest)** 에서 내려받을 수 있습니다.
@@ -107,6 +135,28 @@ npm run tauri build
 npm test           # vitest 1회 실행
 npm run test:watch # 워치 모드
 ```
+
+## 스크린샷 다시 만들기
+
+README의 이미지는 `docs/images/` 아래에 있고, 명령 한 번으로 다시 만듭니다.
+
+```bash
+npm run screenshots
+```
+
+Rust 백엔드도, 실제 Claude/Codex 계정도 필요 없습니다. 프런트엔드가 백엔드와 통신하는
+`window.__TAURI_INTERNALS__`를 통째로 스텁으로 바꿔치기해서, 실제 화면을 데모용 고정
+데이터로 렌더한 뒤 Chromium으로 촬영합니다. 하네스는 `scripts/screenshots/`에 있고
+데모 데이터는 `fixtures.ts`에서 고칩니다.
+
+준비물:
+
+```bash
+sudo apt install ffmpeg fonts-noto-cjk   # GIF 변환 + 한글 폰트
+```
+
+UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대신* 해당 커맨드 이름과 함께
+실패합니다. `scripts/screenshots/tauri-stub.ts`에 응답을 추가하세요.
 
 ## 문서
 
