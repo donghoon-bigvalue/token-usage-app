@@ -140,6 +140,21 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
   font-variant-numeric: tabular-nums;
 }
 
+.history-expand {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.history-breakdown-row td { padding: 2px 8px 8px 20px; }
+.history-breakdown { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.history-breakdown > div { display: flex; gap: 6px; }
+.history-breakdown dt { color: var(--muted); font-size: 12px; }
+.history-breakdown dd { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+
 .history-warn { color: var(--muted); cursor: help; }
 
 .history-download { align-self: flex-start; }

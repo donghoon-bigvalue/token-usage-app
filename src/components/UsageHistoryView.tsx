@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getUsageHistory, downloadUsageXlsx } from "../lib/history";
 import type { UsageHistory } from "../lib/types";
@@ -33,6 +33,16 @@ export default function UsageHistoryView({
   const [downloading, setDownloading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // Keyed by `${year_month}-${provider}` so the open set survives a refresh
+  // that replaces the summary objects.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleRow = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // App owns the counter and keeps it across tab switches, so a non-zero signal
   // says nothing on its own — only a *change* since this mount is a refresh.
@@ -149,17 +159,56 @@ export default function UsageHistoryView({
           </tr>
         </thead>
         <tbody>
-          {history.summaries.map((s) => (
-            <tr key={`${s.year_month}-${s.provider}`}>
-              <td>{s.year_month}</td>
-              <td style={{ color: ACCENT[s.provider] }}>{t(`provider.${s.provider}`)}</td>
-              <td>{formatTokens(s.total_tokens)}</td>
-              <td>
-                {formatUsd(s.cost_usd)}
-                {!s.cost_estimable && <span className="history-warn" title={t("history.notEstimable")}> ≈</span>}
-              </td>
-            </tr>
-          ))}
+          {history.summaries.map((s) => {
+            const key = `${s.year_month}-${s.provider}`;
+            const open = expanded.has(key);
+            const buckets: Array<[string, number]> = [
+              ["bucketInput", s.input_tokens],
+              ["bucketOutput", s.output_tokens],
+              ["bucketCacheRead", s.cache_read_tokens],
+              ["bucketCacheWrite", s.cache_write_tokens],
+              ["bucketTotal", s.total_tokens],
+            ];
+            return (
+              <Fragment key={key}>
+                <tr>
+                  <td>
+                    <button
+                      type="button"
+                      className="history-expand"
+                      aria-expanded={open}
+                      aria-label={t("history.expandRow")}
+                      onClick={() => toggleRow(key)}
+                    >
+                      <span aria-hidden="true">{open ? "▾" : "▸"}</span> {s.year_month}
+                    </button>
+                  </td>
+                  <td style={{ color: ACCENT[s.provider] }}>{t(`provider.${s.provider}`)}</td>
+                  <td>{formatTokens(s.direct_tokens)}</td>
+                  <td>
+                    {formatUsd(s.cost_usd)}
+                    {!s.cost_estimable && <span className="history-warn" title={t("history.notEstimable")}> ≈</span>}
+                  </td>
+                </tr>
+                {open && (
+                  <tr className="history-breakdown-row">
+                    <td colSpan={4}>
+                      <dl className="history-breakdown">
+                        {buckets
+                          .filter(([, value]) => value > 0)
+                          .map(([label, value]) => (
+                            <div key={label}>
+                              <dt>{t(`history.${label}`)}</dt>
+                              <dd>{formatTokens(value)}</dd>
+                            </div>
+                          ))}
+                      </dl>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
 
