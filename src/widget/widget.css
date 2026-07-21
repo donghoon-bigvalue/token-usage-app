@@ -31,6 +31,8 @@ html, body { background: transparent; margin: 0; }
   cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 6px;
 }
 .widget__btn:hover { background: var(--card); }
+/* The refresh button is icon-only, so drop the Spinner's text-label gap. */
+.widget__btn .spinner { margin-right: 0; }
 .widget__body { padding: 8px 10px; cursor: pointer; }
 .widget-group { margin-bottom: 8px; }
 .widget-group__name { font-size: 11px; font-weight: 700; margin: 0 0 4px; color: var(--accent); }

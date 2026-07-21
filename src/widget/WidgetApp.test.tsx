@@ -62,6 +62,28 @@ describe("WidgetApp", () => {
     expect(invoked("show_main")).toHaveLength(0);
   });
 
+  it("spins the refresh button while a refresh is in flight, then stops", async () => {
+    render(<WidgetApp locale="en" />);
+    await waitFor(() => expect(screen.getAllByTestId("bar-fill")).toHaveLength(5));
+    const btn = screen.getByLabelText("Refresh");
+    expect(btn.getAttribute("aria-busy")).toBe("false");
+
+    // Hold the refresh fetch open so we can observe the busy state.
+    let release!: (r: UsageReport) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) =>
+      cmd === "get_usage"
+        ? new Promise((res) => { release = res as (r: UsageReport) => void; })
+        : Promise.resolve(null)) as never);
+
+    fireEvent.click(btn);
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).toBe("true"));
+    expect(btn.querySelector(".spinner--on")).not.toBeNull();
+
+    release(report);
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).toBe("false"));
+    expect(btn.querySelector(".spinner--on")).toBeNull();
+  });
+
   it("hides its own window when the close button is pressed", async () => {
     render(<WidgetApp locale="en" />);
     await waitFor(() => expect(screen.getAllByTestId("bar-fill")).toHaveLength(5));

@@ -1,10 +1,11 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { useUsageReport } from "../lib/useUsageReport";
 import { LimitBar } from "../components/LimitBar";
+import { Spinner } from "../components/Spinner";
 import type { UsageSnapshot } from "../lib/types";
 
 // The window keeps a fixed width; only its height tracks the content so the
@@ -51,13 +52,21 @@ export function WidgetApp({ locale }: { locale: "en" | "ko" }) {
   const { report, loadFailed, now, reload } = useUsageReport();
   const rootRef = useRef<HTMLDivElement>(null);
   useFitWindowHeight(rootRef);
+  // Spin the refresh glyph only while a press is in flight — same affordance as
+  // the main window's header (reuses Spinner + its .spinner--on animation).
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    reload().finally(() => setRefreshing(false));
+  };
 
   return (
     <div className="widget" ref={rootRef}>
       <div className="widget__bar" data-tauri-drag-region>
         <span className="widget__title" data-tauri-drag-region>{t("app.title")}</span>
-        <button className="widget__btn" aria-label={t("app.refresh")}
-          onClick={(e) => { e.stopPropagation(); reload(); }}>⟳</button>
+        <button className="widget__btn" aria-label={t("app.refresh")} aria-busy={refreshing}
+          onClick={(e) => { e.stopPropagation(); refresh(); }}><Spinner spinning={refreshing} /></button>
         <button className="widget__btn" aria-label={t("app.close")}
           onClick={(e) => { e.stopPropagation(); getCurrentWindow().hide(); }}>×</button>
       </div>
