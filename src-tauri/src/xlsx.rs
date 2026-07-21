@@ -44,8 +44,8 @@ fn provider_name(p: ProviderId) -> &'static str {
 /// The five raw token columns plus the total, in column order.
 fn token_cells(d: &MonthlyDetail) -> [u64; 6] {
     [
-        d.input_tokens, d.output_tokens, d.cache_write_tokens,
-        d.cache_read_tokens, d.cached_input_tokens, d.total_tokens,
+        d.raw_input_tokens, d.raw_output_tokens, d.raw_cache_write_tokens,
+        d.raw_cache_read_tokens, d.raw_cached_input_tokens, d.total_tokens,
     ]
 }
 

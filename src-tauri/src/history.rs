@@ -32,12 +32,17 @@ fn display_buckets(
 ) -> DisplayBuckets {
     match p {
         ProviderId::Claude => DisplayBuckets { input, output, cache_read, cache_write },
-        // `saturating_sub` guards a malformed log where cached exceeds input —
-        // u64 underflow would surface as ~1.8e19 tokens rather than an error.
+        // `saturating_sub` and `.min(input)` are a pair, not two independent
+        // guards: a malformed log where cached exceeds input would otherwise
+        // underflow `input` to ~1.8e19 while `cache_read` kept the raw (larger)
+        // `cached_input`, breaking the "buckets sum to total_tokens" rule.
+        // Clamping `cache_read` to `input` keeps `input' + cache_read' == input`
+        // even when the log is nonsense; normal data (cached <= input) is
+        // unaffected by the `.min`.
         ProviderId::Codex => DisplayBuckets {
             input: input.saturating_sub(cached_input),
             output,
-            cache_read: cached_input,
+            cache_read: cached_input.min(input),
             cache_write: 0,
         },
     }
@@ -98,9 +103,9 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         ).direct();
         MonthlyDetail {
             year_month: r.year_month, provider: r.provider, model: r.model,
-            input_tokens: r.input_tokens, output_tokens: r.output_tokens,
-            cache_write_tokens: r.cache_write_tokens, cache_read_tokens: r.cache_read_tokens,
-            cached_input_tokens: r.cached_input_tokens, direct_tokens, total_tokens, cost_usd,
+            raw_input_tokens: r.input_tokens, raw_output_tokens: r.output_tokens,
+            raw_cache_write_tokens: r.cache_write_tokens, raw_cache_read_tokens: r.cache_read_tokens,
+            raw_cached_input_tokens: r.cached_input_tokens, direct_tokens, total_tokens, cost_usd,
         }
     }).collect();
 
@@ -110,8 +115,8 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         let e = sums.entry((d.year_month.clone(), d.provider))
             .or_insert_with(|| SummaryAcc { estimable: true, ..SummaryAcc::default() });
         let b = display_buckets(
-            d.provider, d.input_tokens, d.output_tokens,
-            d.cache_write_tokens, d.cache_read_tokens, d.cached_input_tokens,
+            d.provider, d.raw_input_tokens, d.raw_output_tokens,
+            d.raw_cache_write_tokens, d.raw_cache_read_tokens, d.raw_cached_input_tokens,
         );
         e.total += d.total_tokens;
         e.input += b.input;
@@ -185,8 +190,8 @@ mod tests {
         let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         assert_eq!(h.details.len(), 1);
         let d = &h.details[0];
-        assert_eq!(d.input_tokens, 2_000_000);
-        assert_eq!(d.output_tokens, 1_000_000);
+        assert_eq!(d.raw_input_tokens, 2_000_000);
+        assert_eq!(d.raw_output_tokens, 1_000_000);
         assert_eq!(d.total_tokens, 3_000_000);
         // sonnet-5 intro promo applies at 2026-07 (<= 2026-08): 2M input @2 + 1M output @10 = 14.0
         assert!((d.cost_usd.unwrap() - 14.0).abs() < 1e-9);
@@ -254,6 +259,16 @@ mod tests {
         let h = aggregate(recs, "2026-07".into(), 1_700_000_000);
         assert_eq!(h.details[0].direct_tokens, 40);
         assert_eq!(h.summaries[0].input_tokens, 0);
+
+        // The four display buckets must still reconcile to total_tokens even
+        // for malformed input — that's the whole point of clamping cache_read.
+        let s = &h.summaries[0];
+        assert_eq!(
+            s.input_tokens + s.output_tokens + s.cache_read_tokens + s.cache_write_tokens,
+            s.total_tokens
+        );
+        // cache_read is clamped to input (100), not the raw nonsensical 900.
+        assert_eq!(s.cache_read_tokens, 100);
     }
 
     #[test]

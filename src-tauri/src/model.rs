@@ -82,16 +82,22 @@ pub struct UsageRecord {
 }
 
 /// One aggregated row: (year_month × provider × model). Used for CSV detail.
+///
+/// Detail carries log-verbatim values — the `raw_` fields mean exactly what the
+/// provider's log says, unnormalized. Summary (below) carries display-normalized
+/// values instead. The two share bucket concepts but not always numbers (see
+/// `history::display_buckets`), so the prefix keeps `MonthlyDetail.raw_cache_read_tokens`
+/// from being mistaken for `MonthlySummary.cache_read_tokens`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MonthlyDetail {
     pub year_month: String,
     pub provider: ProviderId,
     pub model: String,
-    pub input_tokens: u64,
-    pub output_tokens: u64,
-    pub cache_write_tokens: u64,
-    pub cache_read_tokens: u64,
-    pub cached_input_tokens: u64,
+    pub raw_input_tokens: u64,
+    pub raw_output_tokens: u64,
+    pub raw_cache_write_tokens: u64,
+    pub raw_cache_read_tokens: u64,
+    pub raw_cached_input_tokens: u64,
     /// Tokens the user actually spent: input + output with the provider's cache
     /// accounting normalized away. Comparable across providers, unlike
     /// `total_tokens`. See `history::display_buckets`.
