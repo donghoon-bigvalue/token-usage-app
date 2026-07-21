@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "token-usage-app",
@@ -17,6 +18,20 @@
         "height": 600,
         "minWidth": 700,
         "minHeight": 480
+      },
+      {
+        "label": "widget",
+        "url": "widget.html",
+        "title": "Widget",
+        "width": 260,
+        "height": 300,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false
       }
     ],
     "security": {

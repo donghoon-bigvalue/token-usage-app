@@ -1,0 +1,43 @@
+/* Transparent window: the OS shows through wherever the page has no paint.
+   The card itself is opaque so the bars stay readable over any wallpaper. */
+html, body { background: transparent; margin: 0; }
+#root { -webkit-user-select: none; user-select: none; }
+
+/* Height is intentionally auto: the card grows to its content and the window
+   is resized to match (see useFitWindowHeight), so the widget never scrolls
+   internally. */
+.widget {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--text);
+}
+.widget__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.widget__title { flex: 1; font-size: 11px; font-weight: 600; opacity: 0.7; }
+.widget__btn {
+  border: none; background: transparent; color: var(--text);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 6px;
+}
+.widget__btn:hover { background: var(--card); }
+/* The refresh button is icon-only, so drop the Spinner's text-label gap. */
+.widget__btn .spinner { margin-right: 0; }
+.widget__body { padding: 8px 10px; cursor: pointer; }
+.widget-group { margin-bottom: 8px; }
+.widget-group__name { font-size: 11px; font-weight: 700; margin: 0 0 4px; color: var(--accent); }
+.widget-group__error { font-size: 11px; opacity: 0.6; margin: 0 0 6px; }
+/* Compact the reused LimitBar for the widget's tighter frame. */
+.widget .limit-bar { margin-bottom: 5px; }
+.widget .limit-bar__row { font-size: 11px; }
+.widget .limit-bar__reset { font-size: 10px; opacity: 0.7; }
