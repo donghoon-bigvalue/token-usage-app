@@ -15,6 +15,9 @@ dist-ssr
 # Tooling state
 .omc
 
+# Screenshot capture leftovers (video + palette); only survives a failed run
+scripts/screenshots/.tmp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
