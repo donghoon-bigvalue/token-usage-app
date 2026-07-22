@@ -47,8 +47,8 @@ export function SettingsPanel({
           onChange={(e) => onChange({ ...settings, refresh_interval_secs: Number(e.target.value) })}
         />
       </label>
-      <UpdateSettingsSection />
       <button className="settings-panel__close" aria-label={t("app.close")} onClick={onClose}>×</button>
+      <UpdateSettingsSection />
     </div>
   );
 }

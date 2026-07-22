@@ -9,7 +9,7 @@
     "codex_spark_weekly": "Spark weekly limit"
   },
   "settings": { "language": "Language", "theme": "Theme", "light": "Light", "dark": "Dark", "system": "System", "interval": "Auto-refresh (seconds)", "thresholds": "Notify at (%)" },
-  "update": { "title": "Update available", "available": "Version v{{version}} is available.", "install": "Update now", "later": "Later", "downloading": "Downloading…", "installed": "Installed — restart to apply", "restart": "Restart now", "error": "Update failed", "retry": "Retry", "current": "Current version v{{version}}", "check": "Check for updates", "checking": "Checking…", "upToDate": "You're on the latest version.", "hasUpdate": "An update is available (v{{version}})" },
+  "update": { "section": "Update", "preview": "Preview popup (temp)", "title": "Update available", "available": "Version v{{version}} is available.", "install": "Update now", "later": "Later", "downloading": "Downloading…", "installed": "Installed — restart to apply", "restart": "Restart now", "error": "Update failed", "retry": "Retry", "current": "Current version v{{version}}", "check": "Check for updates", "checking": "Checking…", "upToDate": "You're on the latest version.", "hasUpdate": "An update is available (v{{version}})" },
   "history": {
     "tab": "Usage history",
     "limitsTab": "Limits",

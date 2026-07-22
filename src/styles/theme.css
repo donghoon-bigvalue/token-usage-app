@@ -88,6 +88,43 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 }
 button { cursor: pointer; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
 
+/* Update section — full-width row that wraps below the language/theme/interval
+   controls; the close button stays pinned top-right on the first row. */
+.settings-update {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+/* "업데이트" title — same size/color as the "언어" field label. */
+.settings-update__title { font-size: 12px; color: var(--muted); }
+.settings-update__current { font-size: 12px; color: var(--text); }
+.settings-update__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.settings-update__check .spinner { margin-right: 0; }
+.settings-update__check[disabled] { opacity: .6; cursor: default; }
+.settings-update__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--text);
+}
+.settings-update__status progress { width: 160px; }
+.settings-update__install { font-size: 12px; }
+.settings-update__preview { font-size: 12px; opacity: .75; }
+
 /* View toggle (Header: 한도 / 사용 이력) */
 .view-toggle { display: flex; gap: 4px; background: var(--track); border-radius: 999px; padding: 3px; flex-shrink: 0; }
 .view-toggle button {
@@ -236,14 +273,16 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
   z-index: 1000;
 }
 .update-dialog {
-  background: var(--surface, #fff);
-  color: var(--text, #111);
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
   width: min(420px, 90vw);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
-.update-dialog__title { margin: 0 0 8px; font-size: 1.1rem; }
+.update-dialog p { margin: 0 0 10px; color: var(--text); }
+.update-dialog__title { margin: 0 0 8px; font-size: 1.1rem; color: var(--text); }
 .update-dialog__notes {
   max-height: 160px;
   overflow: auto;
