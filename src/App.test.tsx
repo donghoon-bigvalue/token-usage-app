@@ -34,9 +34,18 @@ const hhmmss = (unix: number) => new Date(unix * 1000).toLocaleTimeString("en-US
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn(() => Promise.resolve(null)) }));
+vi.mock("./lib/updater", () => ({
+  checkForUpdate: vi.fn().mockResolvedValue(null),
+  installUpdate: vi.fn(),
+  relaunchApp: vi.fn(),
+  getCurrentVersion: vi.fn().mockResolvedValue("1.0.4"),
+}));
+// updater-store는 실제 모듈을 사용한다 — shouldAutoCheck/localStorage 로직이
+// 자동 확인 스로틀 테스트에서 그대로 동작해야 하기 때문에 모킹하지 않는다.
 
 import App from "./App";
 import { invoke } from "@tauri-apps/api/core";
+import { checkForUpdate } from "./lib/updater";
 
 function defaultInvoke(cmd: string) {
   if (cmd === "get_usage") return Promise.resolve(report);
@@ -360,5 +369,34 @@ describe("App", () => {
     // header shimmers forever instead of settling on the dash.
     expect(screen.getByText("Updated —")).toBeInTheDocument();
     expect(container.querySelector(".app-header .skeleton")).toBeNull();
+  });
+});
+
+describe("auto update check", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockImplementation(defaultInvoke as never);
+  });
+
+  it("checks for updates on mount when never checked", async () => {
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+  });
+
+  it("skips the check within 24h of the last check", async () => {
+    localStorage.setItem("updater.lastCheckAt", String(Date.now()));
+    render(<App />);
+    // 짧게 대기 후에도 호출되지 않아야 한다.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(checkForUpdate).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when the startup check fails", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+    // 조용한 자동 체크 실패는 모달을 띄우지 않는다.
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

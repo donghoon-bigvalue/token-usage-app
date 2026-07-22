@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { Settings } from "../lib/types";
+import { UpdateSettingsSection } from "./UpdateSettingsSection";
 
 export function SettingsPanel({
   settings,
@@ -47,6 +48,7 @@ export function SettingsPanel({
         />
       </label>
       <button className="settings-panel__close" aria-label={t("app.close")} onClick={onClose}>×</button>
+      <UpdateSettingsSection />
     </div>
   );
 }

@@ -40,6 +40,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -48,5 +49,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/donghoon-bigvalue/token-usage-app/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIyQjk5QzcxRkJFOEE2MjgKUldRb3B1ajdjWnk1SXAwMUs4RVk1YklPbkFyUlQzY21sTFVLWGtSQW91akp6aGdYdUhYOThVV08K"
+    }
   }
 }

@@ -33,6 +33,8 @@ tauri-plugin-dialog = "2"
 base64 = "0.22"
 thiserror = "2"
 rust_xlsxwriter = "0.96.0"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [dev-dependencies]
 calamine = "0.36.0"
