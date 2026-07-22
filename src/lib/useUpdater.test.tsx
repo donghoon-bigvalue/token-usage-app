@@ -57,4 +57,24 @@ describe("useUpdater", () => {
     await act(async () => { await result.current.install(); });
     await waitFor(() => expect(result.current.state.kind).toBe("installed"));
   });
+
+  it("dismiss twice only records once", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(info);
+    const { result } = renderHook(() => useUpdater());
+    await act(async () => { await result.current.check(); });
+    act(() => { result.current.dismiss(); });
+    act(() => { result.current.dismiss(); });
+    expect(setDismissedVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reinstall after a completed install", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(info);
+    (installUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useUpdater());
+    await act(async () => { await result.current.check(); });
+    await act(async () => { await result.current.install(); });
+    await act(async () => { await result.current.install(); });
+    expect(installUpdate).toHaveBeenCalledTimes(1);
+    expect(result.current.state.kind).toBe("installed");
+  });
 });
