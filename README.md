@@ -182,3 +182,28 @@ UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대
 ## 라이선스
 
 이 프로젝트는 [MIT License](LICENSE)로 배포됩니다.
+
+## 자동 업데이트
+
+앱은 시작 시 하루 1회 최신 버전을 확인하고, 새 버전이 있으면 팝업으로 안내합니다.
+`[자동 업데이트]`를 누르면 내려받아 설치 후 재시작하고, `[다음에 하기]`를 누르면 해당
+버전은 다시 묻지 않습니다. 설정 화면에서 **현재 버전 확인**과 **수동 업데이트 확인**도
+가능합니다.
+
+### 유지관리자 셋업 (최초 1회)
+
+1. 서명 키페어 생성: `npm run tauri signer generate -- -w ~/.tauri/token-usage-app.key`
+2. 출력된 **Public key**를 `src-tauri/tauri.conf.json`의 `plugins.updater.pubkey`에 반영.
+3. GitHub Secrets 등록:
+   - `TAURI_SIGNING_PRIVATE_KEY` = 개인키 파일 내용
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = 개인키 비밀번호
+4. `v*` 태그를 push하면 CI가 서명된 설치 파일과 `latest.json`을 Draft 릴리스에 올립니다.
+   내용을 확인한 뒤 릴리스를 **Publish**하면 사용자에게 업데이트가 배포됩니다.
+
+### 한계
+
+- **Linux**: AppImage만 자동 업데이트를 지원합니다. `.deb`/`.rpm` 사용자는 릴리스
+  페이지에서 수동으로 새 버전을 내려받아야 합니다.
+- **OS 코드서명 미적용**: 설치·실행 시 Windows SmartScreen 또는 macOS Gatekeeper 경고가
+  나타날 수 있습니다. 이는 업데이트 서명(minisign)과는 별개이며 자동 업데이트 동작에는
+  영향을 주지 않습니다. OS 코드서명은 별도 이슈로 다룹니다.
