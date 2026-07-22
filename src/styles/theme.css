@@ -123,7 +123,6 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 }
 .settings-update__status progress { width: 160px; }
 .settings-update__install { font-size: 12px; }
-.settings-update__preview { font-size: 12px; opacity: .75; }
 
 /* View toggle (Header: 한도 / 사용 이력) */
 .view-toggle { display: flex; gap: 4px; background: var(--track); border-radius: 999px; padding: 3px; flex-shrink: 0; }
