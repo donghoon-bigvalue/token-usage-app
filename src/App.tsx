@@ -70,11 +70,18 @@ export default function App() {
     return () => { un.then((f) => f()); };
   }, [i18n, applyReport, load]);
 
-  // 하루 1회 자동 업데이트 확인. 결과와 무관하게 확인 시각을 기록한다.
+  // 시작 시 ①강제 업데이트 정책 확인 → ②(강제가 아니면) 하루 1회 업데이트 확인.
+  // 정책 확인은 스로틀을 타지 않는다 — 킬 스위치가 최대 24시간 늦게 도달하면
+  // 존재 의미가 없다. 강제가 걸리면 enforce()가 확인까지 수행하므로 여기선 끝.
   useEffect(() => {
-    if (!shouldAutoCheck(Date.now(), getLastCheckAt())) return;
-    updater.check().finally(() => setLastCheckAt(Date.now()));
-    // updater.check는 안정적인 useCallback이라 마운트 시 1회만 실행하면 된다.
+    updater
+      .enforce()
+      .then((forced) => {
+        if (forced || !shouldAutoCheck(Date.now(), getLastCheckAt())) return;
+        return updater.check().finally(() => setLastCheckAt(Date.now()));
+      })
+      .catch(() => {});
+    // enforce/check는 안정적인 useCallback이라 마운트 시 1회만 실행하면 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -138,11 +145,15 @@ export default function App() {
         const s = updater.state;
         // 시작 시 자동 체크는 조용해야 한다 — 실패(오프라인/최초 릴리스 전 404 등)는
         // 모달을 띄우지 않는다. 사용자가 관여한 뒤의 오류만 보여준다.
+        // 강제 업데이트만 예외다 — dismissed 기록도, 조용한 실패 규칙도 무시하고
+        // 닫을 수 없는 팝업으로 붙잡는다.
         const show =
-          (s.kind === "available" && shouldPrompt(s.info.version, getDismissedVersion())) ||
+          (s.kind === "available" &&
+            shouldPrompt(s.info.version, getDismissedVersion(), !!s.force)) ||
+          s.kind === "blocked" ||
           s.kind === "downloading" ||
           s.kind === "installed" ||
-          (s.kind === "error" && updateEngaged);
+          (s.kind === "error" && (updateEngaged || !!s.force));
         return show ? (
           <UpdateDialog
             state={s}

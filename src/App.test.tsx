@@ -40,12 +40,18 @@ vi.mock("./lib/updater", () => ({
   relaunchApp: vi.fn(),
   getCurrentVersion: vi.fn().mockResolvedValue("1.0.4"),
 }));
+// 원격 강제 정책은 기본적으로 "없음" — 개별 테스트에서만 켠다.
+vi.mock("./lib/remote-config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./lib/remote-config")>()),
+  fetchForcePolicy: vi.fn().mockResolvedValue(null),
+}));
 // updater-store는 실제 모듈을 사용한다 — shouldAutoCheck/localStorage 로직이
 // 자동 확인 스로틀 테스트에서 그대로 동작해야 하기 때문에 모킹하지 않는다.
 
 import App from "./App";
 import { invoke } from "@tauri-apps/api/core";
 import { checkForUpdate } from "./lib/updater";
+import { fetchForcePolicy } from "./lib/remote-config";
 
 function defaultInvoke(cmd: string) {
   if (cmd === "get_usage") return Promise.resolve(report);
@@ -390,6 +396,57 @@ describe("auto update check", () => {
     // 짧게 대기 후에도 호출되지 않아야 한다.
     await new Promise((r) => setTimeout(r, 50));
     expect(checkForUpdate).not.toHaveBeenCalled();
+  });
+
+  it("suppresses a dismissed version", async () => {
+    localStorage.setItem("updater.dismissedVersion", "1.1.0");
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      version: "1.1.0", notes: "", update: {},
+    });
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("checks the force policy on every start, throttle or not", async () => {
+    localStorage.setItem("updater.lastCheckAt", String(Date.now()));
+    render(<App />);
+    // 스로틀에 걸려 업데이트 확인은 건너뛰지만, 정책 조회는 매번 한다.
+    await waitFor(() => expect(fetchForcePolicy).toHaveBeenCalled());
+    expect(checkForUpdate).not.toHaveBeenCalled();
+  });
+
+  it("forces the dialog open even for a dismissed version and a fresh throttle", async () => {
+    localStorage.setItem("updater.dismissedVersion", "1.1.0");
+    localStorage.setItem("updater.lastCheckAt", String(Date.now()));
+    (fetchForcePolicy as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      minimumVersion: "1.2.0", messages: null,
+    });
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      version: "1.1.0", notes: "", update: {},
+    });
+    render(<App />);
+    expect(await screen.findByRole("dialog", { name: "Update required" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Later" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open download page" })).toBeInTheDocument();
+  });
+
+  it("blocks with a download-only dialog when forced with no update available", async () => {
+    (fetchForcePolicy as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      minimumVersion: "1.2.0", messages: null,
+    });
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    render(<App />);
+    expect(await screen.findByRole("dialog", { name: "Update required" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open download page" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Update now" })).toBeNull();
+  });
+
+  it("stays open to the app when the policy fetch fails", async () => {
+    (fetchForcePolicy as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Max 20x")).toBeInTheDocument());
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("stays silent when the startup check fails", async () => {

@@ -9,7 +9,7 @@
     "codex_spark_weekly": "Spark 주간 한도"
   },
   "settings": { "language": "언어", "theme": "테마", "light": "라이트", "dark": "다크", "system": "시스템", "interval": "자동 새로고침 (초)", "thresholds": "알림 임계치 (%)" },
-  "update": { "section": "업데이트", "title": "업데이트 가능", "available": "새 버전 v{{version}}이(가) 준비되었습니다.", "releaseNotes": "릴리스 노트", "install": "자동 업데이트", "later": "다음에 하기", "downloading": "다운로드 중…", "installed": "설치 완료 — 재시작하면 적용됩니다", "restart": "지금 재시작", "error": "업데이트에 실패했어요", "retry": "다시 시도", "current": "현재 버전 v{{version}}", "check": "업데이트 확인", "checking": "확인 중…", "upToDate": "최신 버전을 사용 중입니다.", "hasUpdate": "업데이트가 있습니다 (v{{version}})" },
+  "update": { "section": "업데이트", "title": "업데이트 가능", "available": "새 버전 v{{version}}이(가) 준비되었습니다.", "forcedTitle": "업데이트가 필요해요", "forced": "더 안정적인 서비스 제공을 위해 최신 버전으로의 업데이트가 필요합니다. 업데이트 후 이용해 주세요.", "openDownload": "다운로드 페이지 열기", "releaseNotes": "릴리스 노트", "install": "자동 업데이트", "later": "다음에 하기", "downloading": "다운로드 중…", "installed": "설치 완료 — 재시작하면 적용됩니다", "restart": "지금 재시작", "error": "업데이트에 실패했어요", "retry": "다시 시도", "current": "현재 버전 v{{version}}", "check": "업데이트 확인", "checking": "확인 중…", "upToDate": "최신 버전을 사용 중입니다.", "hasUpdate": "업데이트가 있습니다 (v{{version}})" },
   "history": {
     "tab": "사용 이력",
     "limitsTab": "한도",

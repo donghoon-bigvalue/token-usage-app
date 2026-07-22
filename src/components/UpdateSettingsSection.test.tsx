@@ -37,7 +37,7 @@ describe("UpdateSettingsSection", () => {
 
   it("shows an update when available", async () => {
     (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({
-      version: "1.1.0", notes: "", update: {},
+      version: "1.1.0", notes: "", forced: false, update: {},
     });
     render(<UpdateSettingsSection />);
     screen.getByRole("button", { name: "업데이트 확인" }).click();

@@ -32,6 +32,9 @@ describe("shouldPrompt", () => {
   it("prompts again for a newer version", () => {
     expect(shouldPrompt("1.2.0", "1.1.0")).toBe(true);
   });
+  it("ignores the dismissed record for a forced update", () => {
+    expect(shouldPrompt("1.1.0", "1.1.0", true)).toBe(true);
+  });
 });
 
 describe("persistence", () => {
