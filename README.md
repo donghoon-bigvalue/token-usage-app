@@ -174,6 +174,9 @@ UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대
 
 - 설계 문서: `docs/superpowers/specs/2026-07-14-token-usage-app-design.md`
 - 구현 계획: `docs/superpowers/plans/2026-07-14-token-usage-app.md`
+- 업데이트 서명 키 · 릴리스 셋업(유지관리자용): [`docs/updater-signing.md`](docs/updater-signing.md)
+- 강제 업데이트 정책 저장소: [donghoon-bigvalue/token-usage-app-config](https://github.com/donghoon-bigvalue/token-usage-app-config)
+  — `force-update.json`으로 관리하며, 형식은 [`docs/force-update.example.json`](docs/force-update.example.json) 참고
 
 ## 권장 IDE 설정
 
