@@ -145,6 +145,17 @@ describe("useUpdater", () => {
     expect(result.current.state).toEqual({ kind: "error", message: "net", force: policy });
   });
 
+  it("keeps the force policy through a completed forced install", async () => {
+    armForce();
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(info);
+    (installUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useUpdater());
+    await act(async () => { await result.current.enforce(); });
+    await act(async () => { await result.current.install(); });
+    // 강제 흐름 중 제목이 일반 업데이트로 되돌아가면 안 된다.
+    expect(result.current.state).toEqual({ kind: "installed", force: policy });
+  });
+
   it("does not reinstall after a completed install", async () => {
     (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(info);
     (installUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);

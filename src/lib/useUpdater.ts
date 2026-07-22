@@ -18,7 +18,7 @@ export type UpdaterState =
   | { kind: "upToDate" }
   | { kind: "available"; info: UpdateInfo; force?: Force }
   | { kind: "downloading"; info: UpdateInfo; fraction: number; force?: Force }
-  | { kind: "installed" }
+  | { kind: "installed"; force?: Force }
   // 강제인데 받을 업데이트가 없는 경우 — 정책이 아직 퍼블리시되지 않은 버전을
   // 요구하거나 확인이 실패한 상황. 인앱 설치 대신 다운로드 페이지만 안내한다.
   | { kind: "blocked"; force: Force }
@@ -88,7 +88,7 @@ export function useUpdater() {
         setState((s) => (s.kind === "downloading" ? { ...s, fraction } : s))
       );
       infoRef.current = null; // 완료 — 재설치 방지
-      setState({ kind: "installed" });
+      setState({ kind: "installed", force: force() });
     } catch (e) {
       // 실패 시 infoRef는 유지해 재시도(retry)가 가능하도록 한다.
       setState({

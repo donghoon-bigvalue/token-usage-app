@@ -136,4 +136,12 @@ describe("UpdateDialog", () => {
     screen.getByRole("button", { name: "지금 재시작" }).click();
     expect(onRelaunch).toHaveBeenCalledOnce();
   });
+
+  it("keeps the forced title after a forced install completes", () => {
+    render(
+      <UpdateDialog state={{ kind: "installed", force }} onInstall={() => {}} onDismiss={() => {}} onRelaunch={() => {}} />
+    );
+    expect(screen.getByRole("dialog", { name: "업데이트가 필요해요" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "지금 재시작" })).toBeInTheDocument();
+  });
 });

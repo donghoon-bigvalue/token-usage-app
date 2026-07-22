@@ -10,6 +10,7 @@ function forceOf(state: UpdaterState): Force | undefined {
   switch (state.kind) {
     case "available":
     case "downloading":
+    case "installed":
     case "error":
       return state.force;
     case "blocked":

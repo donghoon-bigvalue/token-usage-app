@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useUpdater } from "../lib/useUpdater";
 import { getCurrentVersion } from "../lib/updater";
 import { Spinner } from "./Spinner";
+import { UpdatePreview } from "./UpdatePreview";
 
 export function UpdateSettingsSection() {
   const { t } = useTranslation();
@@ -68,6 +69,9 @@ export function UpdateSettingsSection() {
 
         {state.kind === "error" && <span>{t("update.error")}: {state.message}</span>}
       </div>
+
+      {/* 개발 빌드 전용 — 프로덕션에서는 이 가드로 통째로 사라진다. */}
+      {import.meta.env.DEV && <UpdatePreview />}
     </div>
   );
 }
