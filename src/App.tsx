@@ -9,6 +9,15 @@ import { ProviderCard } from "./components/ProviderCard";
 import { ProviderCardSkeleton } from "./components/ProviderCardSkeleton";
 import { SettingsPanel } from "./components/SettingsPanel";
 import UsageHistoryView from "./components/UsageHistoryView";
+import { useUpdater } from "./lib/useUpdater";
+import { UpdateDialog } from "./components/UpdateDialog";
+import {
+  shouldAutoCheck,
+  shouldPrompt,
+  getLastCheckAt,
+  setLastCheckAt,
+  getDismissedVersion,
+} from "./lib/updater-store";
 import "./styles/theme.css";
 
 export default function App() {
@@ -29,6 +38,7 @@ export default function App() {
   const [historyBusy, setHistoryBusy] = useState(false);
   // Only a press should spin the button; a cold load shows a skeleton instead.
   const [refreshPressed, setRefreshPressed] = useState(false);
+  const updater = useUpdater();
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
@@ -56,6 +66,14 @@ export default function App() {
     const un = onUsageUpdated(applyReport);
     return () => { un.then((f) => f()); };
   }, [i18n, applyReport, load]);
+
+  // 하루 1회 자동 업데이트 확인. 결과와 무관하게 확인 시각을 기록한다.
+  useEffect(() => {
+    if (!shouldAutoCheck(Date.now(), getLastCheckAt())) return;
+    updater.check().finally(() => setLastCheckAt(Date.now()));
+    // updater.check는 안정적인 useCallback이라 마운트 시 1회만 실행하면 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 카운트다운 틱
   useEffect(() => {
@@ -113,6 +131,19 @@ export default function App() {
 
   return (
     <main className="app">
+      {(() => {
+        const s = updater.state;
+        const suppressed =
+          s.kind === "available" && !shouldPrompt(s.info.version, getDismissedVersion());
+        return suppressed ? null : (
+          <UpdateDialog
+            state={s}
+            onInstall={updater.install}
+            onDismiss={updater.dismiss}
+            onRelaunch={updater.relaunch}
+          />
+        );
+      })()}
       <Header
         onRefresh={refresh}
         onOpenSettings={() => setShowSettings((v) => !v)}
