@@ -12,7 +12,8 @@ vi.mock("./updater-store", () => ({ setDismissedVersion: vi.fn() }));
 import { checkForUpdate, installUpdate } from "./updater";
 import { setDismissedVersion } from "./updater-store";
 
-const info = { version: "1.1.0", notes: "x", update: {} as never };
+const info = { version: "1.1.0", notes: "x", forced: false, update: {} as never };
+const forcedInfo = { ...info, notes: "<!-- force-update -->", forced: true };
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -35,7 +36,7 @@ describe("useUpdater", () => {
     (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() => useUpdater());
     await act(async () => { await result.current.check(); });
-    expect(result.current.state).toEqual({ kind: "error", message: "boom" });
+    expect(result.current.state).toEqual({ kind: "error", message: "boom", forced: false });
   });
 
   it("dismiss records the version and returns to idle", async () => {
@@ -65,6 +66,24 @@ describe("useUpdater", () => {
     act(() => { result.current.dismiss(); });
     act(() => { result.current.dismiss(); });
     expect(setDismissedVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to dismiss a forced update", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(forcedInfo);
+    const { result } = renderHook(() => useUpdater());
+    await act(async () => { await result.current.check(); });
+    act(() => { result.current.dismiss(); });
+    expect(setDismissedVersion).not.toHaveBeenCalled();
+    expect(result.current.state).toEqual({ kind: "available", info: forcedInfo });
+  });
+
+  it("keeps the forced flag when a forced install fails", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(forcedInfo);
+    (installUpdate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("net"));
+    const { result } = renderHook(() => useUpdater());
+    await act(async () => { await result.current.check(); });
+    await act(async () => { await result.current.install(); });
+    expect(result.current.state).toEqual({ kind: "error", message: "net", forced: true });
   });
 
   it("does not reinstall after a completed install", async () => {

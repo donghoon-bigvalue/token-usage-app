@@ -14,7 +14,9 @@ export type UpdaterState =
   | { kind: "available"; info: UpdateInfo }
   | { kind: "downloading"; info: UpdateInfo; fraction: number }
   | { kind: "installed" }
-  | { kind: "error"; message: string };
+  // error는 info를 잃는 상태라 forced를 따로 싣는다 — 강제 업데이트 설치가
+  // 실패했을 때 "다음에 하기"가 되살아나면 안 된다.
+  | { kind: "error"; message: string; forced: boolean };
 
 export function useUpdater() {
   const [state, setState] = useState<UpdaterState>({ kind: "idle" });
@@ -33,7 +35,12 @@ export function useUpdater() {
       infoRef.current = info;
       setState(info ? { kind: "available", info } : { kind: "upToDate" });
     } catch (e) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      // 확인 자체가 실패하면 강제 여부를 알 길이 없다 — 닫을 수 있는 오류로 둔다.
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+        forced: false,
+      });
     }
   }, []);
 
@@ -50,13 +57,20 @@ export function useUpdater() {
       setState({ kind: "installed" });
     } catch (e) {
       // 실패 시 infoRef는 유지해 재시도(retry)가 가능하도록 한다.
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setState({
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+        forced: info.forced,
+      });
     } finally {
       busyRef.current = false;
     }
   }, []);
 
   const dismiss = useCallback(() => {
+    // 강제 업데이트는 닫을 수 없다. UI가 버튼을 감추지만, 다른 진입점이 실수로
+    // 호출하더라도 상태가 idle로 빠지지 않도록 훅에서도 막는다.
+    if (infoRef.current?.forced) return;
     if (infoRef.current) {
       setDismissedVersion(infoRef.current.version);
       infoRef.current = null; // 한 번만 기록 — 반복 dismiss는 no-op

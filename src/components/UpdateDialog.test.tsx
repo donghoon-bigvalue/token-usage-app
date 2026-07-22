@@ -7,7 +7,9 @@ import type { UpdaterState } from "../lib/useUpdater";
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-const info = { version: "1.1.0", notes: "release notes", update: {} as never };
+const info = { version: "1.1.0", notes: "release notes", forced: false, update: {} as never };
+const forcedInfo = { ...info, notes: "<!-- force-update -->", forced: true };
+const RELEASES_URL = "https://github.com/donghoon-bigvalue/token-usage-app/releases";
 
 describe("UpdateDialog", () => {
   // 어서션이 한국어 문구를 기대하므로, 앱 전역 기본값인 "en"과 무관하게
@@ -51,6 +53,55 @@ describe("UpdateDialog", () => {
     const state: UpdaterState = { kind: "downloading", info, fraction: 0.42 };
     render(<UpdateDialog state={state} onInstall={() => {}} onDismiss={() => {}} onRelaunch={() => {}} />);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "42");
+  });
+
+  it("hides the dismiss button and leads to the releases page when forced", () => {
+    render(
+      <UpdateDialog state={{ kind: "available", info: forcedInfo }} onInstall={() => {}} onDismiss={() => {}} onRelaunch={() => {}} />
+    );
+    expect(screen.getByRole("dialog", { name: "업데이트가 필요해요" })).toBeInTheDocument();
+    expect(screen.getByText(/1\.1\.0/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "다음에 하기" })).toBeNull();
+    screen.getByRole("button", { name: "다운로드 페이지 열기" }).click();
+    expect(openUrl).toHaveBeenCalledWith(RELEASES_URL);
+  });
+
+  it("still offers the in-app install when forced", () => {
+    const onInstall = vi.fn();
+    render(
+      <UpdateDialog state={{ kind: "available", info: forcedInfo }} onInstall={onInstall} onDismiss={() => {}} onRelaunch={() => {}} />
+    );
+    screen.getByRole("button", { name: "자동 업데이트" }).click();
+    expect(onInstall).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a forced error dialog closed-off", () => {
+    render(
+      <UpdateDialog
+        state={{ kind: "error", message: "net", forced: true }}
+        onInstall={() => {}}
+        onDismiss={() => {}}
+        onRelaunch={() => {}}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "다음에 하기" })).toBeNull();
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
+    screen.getByRole("button", { name: "다운로드 페이지 열기" }).click();
+    expect(openUrl).toHaveBeenCalledWith(RELEASES_URL);
+  });
+
+  it("keeps the dismiss button on a normal error", () => {
+    const onDismiss = vi.fn();
+    render(
+      <UpdateDialog
+        state={{ kind: "error", message: "net", forced: false }}
+        onInstall={() => {}}
+        onDismiss={onDismiss}
+        onRelaunch={() => {}}
+      />
+    );
+    screen.getByRole("button", { name: "다음에 하기" }).click();
+    expect(onDismiss).toHaveBeenCalledOnce();
   });
 
   it("offers restart when installed", () => {

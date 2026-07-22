@@ -138,11 +138,14 @@ export default function App() {
         const s = updater.state;
         // 시작 시 자동 체크는 조용해야 한다 — 실패(오프라인/최초 릴리스 전 404 등)는
         // 모달을 띄우지 않는다. 사용자가 관여한 뒤의 오류만 보여준다.
+        // 강제 업데이트만 예외다 — dismissed 기록도, 조용한 실패 규칙도 무시하고
+        // 닫을 수 없는 팝업으로 붙잡는다.
         const show =
-          (s.kind === "available" && shouldPrompt(s.info.version, getDismissedVersion())) ||
+          (s.kind === "available" &&
+            shouldPrompt(s.info.version, getDismissedVersion(), s.info.forced)) ||
           s.kind === "downloading" ||
           s.kind === "installed" ||
-          (s.kind === "error" && updateEngaged);
+          (s.kind === "error" && (updateEngaged || s.forced));
         return show ? (
           <UpdateDialog
             state={s}

@@ -392,6 +392,28 @@ describe("auto update check", () => {
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
 
+  it("suppresses a dismissed version", async () => {
+    localStorage.setItem("updater.dismissedVersion", "1.1.0");
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      version: "1.1.0", notes: "", forced: false, update: {},
+    });
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("forces the dialog open even for a dismissed version", async () => {
+    localStorage.setItem("updater.dismissedVersion", "1.1.0");
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      version: "1.1.0", notes: "<!-- force-update -->", forced: true, update: {},
+    });
+    render(<App />);
+    const dialog = await screen.findByRole("dialog", { name: "Update required" });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Later" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open download page" })).toBeInTheDocument();
+  });
+
   it("stays silent when the startup check fails", async () => {
     (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
     render(<App />);
