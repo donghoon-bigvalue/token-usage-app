@@ -39,6 +39,9 @@ export default function App() {
   // Only a press should spin the button; a cold load shows a skeleton instead.
   const [refreshPressed, setRefreshPressed] = useState(false);
   const updater = useUpdater();
+  // 사용자가 '자동 업데이트'를 눌러 관여했는지. 시작 시 자동 체크의 조용한 실패와
+  // 사용자가 유발한 설치 실패를 구분해, 후자에서만 오류 모달을 띄운다.
+  const [updateEngaged, setUpdateEngaged] = useState(false);
 
   // 성공한 스냅샷을 provider별로 유지 — 일시적 실패(429 등)가 차트를 지우지 않도록.
   const applyReport = useCallback((next: UsageReport) => {
@@ -133,16 +136,21 @@ export default function App() {
     <main className="app">
       {(() => {
         const s = updater.state;
-        const suppressed =
-          s.kind === "available" && !shouldPrompt(s.info.version, getDismissedVersion());
-        return suppressed ? null : (
+        // 시작 시 자동 체크는 조용해야 한다 — 실패(오프라인/최초 릴리스 전 404 등)는
+        // 모달을 띄우지 않는다. 사용자가 관여한 뒤의 오류만 보여준다.
+        const show =
+          (s.kind === "available" && shouldPrompt(s.info.version, getDismissedVersion())) ||
+          s.kind === "downloading" ||
+          s.kind === "installed" ||
+          (s.kind === "error" && updateEngaged);
+        return show ? (
           <UpdateDialog
             state={s}
-            onInstall={updater.install}
-            onDismiss={updater.dismiss}
+            onInstall={() => { setUpdateEngaged(true); updater.install(); }}
+            onDismiss={() => { setUpdateEngaged(false); updater.dismiss(); }}
             onRelaunch={updater.relaunch}
           />
-        );
+        ) : null;
       })()}
       <Header
         onRefresh={refresh}

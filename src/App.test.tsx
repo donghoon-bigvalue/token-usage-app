@@ -391,4 +391,12 @@ describe("auto update check", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
+
+  it("stays silent when the startup check fails", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+    // 조용한 자동 체크 실패는 모달을 띄우지 않는다.
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
