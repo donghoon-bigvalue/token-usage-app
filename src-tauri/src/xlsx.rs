@@ -18,8 +18,8 @@ struct Labels {
 const EN: Labels = Labels {
     sheet: "Usage",
     headers: [
-        "Month", "Provider", "Model", "Input tokens", "Output tokens",
-        "Cache write", "Cache read", "Cached input", "Direct tokens",
+        "Month", "Provider", "Model", "Input tokens (raw)", "Output tokens (raw)",
+        "Cache write (raw)", "Cache read (raw)", "Cached input (raw)", "Direct tokens",
         "Total tokens", "Cost (USD)",
     ],
     total: "Total",
@@ -28,8 +28,8 @@ const EN: Labels = Labels {
 const KO: Labels = Labels {
     sheet: "사용량",
     headers: [
-        "연월", "서비스", "모델", "입력 토큰", "출력 토큰",
-        "캐시 쓰기", "캐시 읽기", "캐시 입력", "직접 사용 토큰",
+        "연월", "서비스", "모델", "입력 토큰(원본)", "출력 토큰(원본)",
+        "캐시 쓰기(원본)", "캐시 읽기(원본)", "캐시 입력(원본)", "직접 사용 토큰",
         "전체 토큰", "추정 비용($)",
     ],
     total: "합계",
@@ -174,6 +174,11 @@ mod tests {
         assert_eq!(text(&r[0][0]), "Month");
         assert_eq!(text(&r[0][1]), "Provider");
         assert_eq!(text(&r[0][2]), "Model");
+        assert_eq!(text(&r[0][3]), "Input tokens (raw)");
+        assert_eq!(text(&r[0][4]), "Output tokens (raw)");
+        assert_eq!(text(&r[0][5]), "Cache write (raw)");
+        assert_eq!(text(&r[0][6]), "Cache read (raw)");
+        assert_eq!(text(&r[0][7]), "Cached input (raw)");
         assert_eq!(text(&r[0][8]), "Direct tokens");
         assert_eq!(text(&r[0][9]), "Total tokens");
         assert_eq!(text(&r[0][10]), "Cost (USD)");
@@ -257,6 +262,11 @@ mod tests {
 
         assert_eq!(text(&ko[0][0]), "연월");
         assert_eq!(text(&ko[0][2]), "모델");
+        assert_eq!(text(&ko[0][3]), "입력 토큰(원본)");
+        assert_eq!(text(&ko[0][4]), "출력 토큰(원본)");
+        assert_eq!(text(&ko[0][5]), "캐시 쓰기(원본)");
+        assert_eq!(text(&ko[0][6]), "캐시 읽기(원본)");
+        assert_eq!(text(&ko[0][7]), "캐시 입력(원본)");
         assert_eq!(text(&ko[0][8]), "직접 사용 토큰");
         assert_eq!(text(&ko[0][9]), "전체 토큰");
         assert_eq!(text(&ko[0][10]), "추정 비용($)");

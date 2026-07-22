@@ -31,6 +31,7 @@
     "bucketInput": "입력",
     "bucketOutput": "출력",
     "bucketCacheRead": "캐시 읽기",
+    "bucketCachedInput": "캐시 입력",
     "bucketCacheWrite": "캐시 쓰기",
     "bucketTotal": "총합"
   }

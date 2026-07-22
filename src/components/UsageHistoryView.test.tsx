@@ -270,6 +270,24 @@ describe("UsageHistoryView", () => {
     expect(screen.getByText("9,000,000")).toBeTruthy();
   });
 
+  it("labels Codex cached input separately from Claude cache reads", async () => {
+    getUsageHistory.mockResolvedValue({
+      ...HISTORY,
+      summaries: [{
+        ...HISTORY.summaries[1],
+        cache_read_tokens: 1_000_000,
+        total_tokens: 8_654_321,
+      }],
+    });
+    render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+
+    fireEvent.click(screen.getByRole("button", { name: "2026-07" }));
+
+    expect(screen.getByText("Cached input")).toBeTruthy();
+    expect(screen.queryByText("Cache read")).toBeNull();
+  });
+
   it("leaves empty buckets out of the breakdown", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);
     render(<UsageHistoryView />);
