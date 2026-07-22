@@ -24,7 +24,14 @@
     "notEstimable": "일부 모델 단가 미등록",
     "colMonth": "연월",
     "colProvider": "서비스",
-    "colTokens": "토큰",
-    "colCost": "추정 비용($)"
+    "colTokens": "직접 사용 토큰",
+    "colCost": "추정 비용($)",
+    "withCache": "캐시 포함 {{total}}",
+    "cacheNote": "직접 사용 = 입력 + 출력. 캐시 읽기는 대화 컨텍스트를 매 턴 다시 참조하며 쌓이는 값이라 대화가 길어질수록 커져요",
+    "bucketInput": "입력",
+    "bucketOutput": "출력",
+    "bucketCacheRead": "캐시 읽기",
+    "bucketCacheWrite": "캐시 쓰기",
+    "bucketTotal": "총합"
   }
 }

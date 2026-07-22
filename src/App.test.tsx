@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import "./i18n";
-import type { UsageReport, Settings } from "./lib/types";
+import type { UsageReport, Settings, UsageHistory } from "./lib/types";
 
 const report: UsageReport = {
   claude: { provider: "claude", plan: "Max 20x", plan_raw: "max", source: "live", updated_at: 10, windows: [{ id: "claude_session", used_percent: 5, resets_at: 999999999, available: true }], error: null },
@@ -12,10 +12,17 @@ const settings: Settings = { language: "en", theme: "light", refresh_interval_se
 // 2026-07-16 09:00:00Z — distinct from the limits snapshot's updated_at so the
 // header can't accidentally pass by showing the wrong one.
 const SCANNED_AT = 1784192400;
-const history = {
+const history: UsageHistory = {
   current_month: "2026-07",
   scanned_at: SCANNED_AT,
-  summaries: [{ year_month: "2026-07", provider: "claude", total_tokens: 42, cost_usd: 1.5, cost_estimable: true }],
+  // Buckets must reconcile: input + output + cache_read + cache_write === total_tokens,
+  // and direct_tokens === input_tokens + output_tokens.
+  summaries: [{
+    year_month: "2026-07", provider: "claude",
+    input_tokens: 10, output_tokens: 5,
+    cache_read_tokens: 25, cache_write_tokens: 2,
+    direct_tokens: 15, total_tokens: 42, cost_usd: 1.5, cost_estimable: true,
+  }],
   details: [],
 };
 const hhmmss = (unix: number) => new Date(unix * 1000).toLocaleTimeString("en-US");

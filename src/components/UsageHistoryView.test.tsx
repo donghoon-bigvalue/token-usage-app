@@ -15,8 +15,20 @@ const HISTORY = {
   current_month: "2026-07",
   scanned_at: 1784192400,
   summaries: [
-    { year_month: "2026-07", provider: "claude", total_tokens: 1234567, cost_usd: 12.34, cost_estimable: true },
-    { year_month: "2026-07", provider: "codex", total_tokens: 7654321, cost_usd: 5.5, cost_estimable: true },
+    {
+      year_month: "2026-07", provider: "claude",
+      input_tokens: 1_000_000, output_tokens: 234_567,
+      cache_read_tokens: 9_000_000, cache_write_tokens: 500_000,
+      direct_tokens: 1_234_567, total_tokens: 10_734_567,
+      cost_usd: 12.34, cost_estimable: true,
+    },
+    {
+      year_month: "2026-07", provider: "codex",
+      input_tokens: 7_000_000, output_tokens: 654_321,
+      cache_read_tokens: 0, cache_write_tokens: 0,
+      direct_tokens: 7_654_321, total_tokens: 7_654_321,
+      cost_usd: 5.5, cost_estimable: true,
+    },
   ],
   details: [],
 };
@@ -29,6 +41,41 @@ describe("UsageHistoryView", () => {
     render(<UsageHistoryView />);
     await waitFor(() => expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0));
     expect(screen.getAllByText("2026-07").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("leads with direct tokens and keeps the cache-inclusive total as a subline", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { container } = render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+    // The headline is what the user spent, not the cache-dominated total.
+    // Scoped to the card: the monthly table row now shows the same direct-token
+    // figure (Task 4), so an unscoped text query would match both.
+    expect(container.querySelector(".history-card-tokens")?.textContent).toContain("1,234,567");
+    expect(screen.getByText(/10,734,567 incl\. cache/)).toBeTruthy();
+  });
+
+  it("omits the cache subline when a provider has no cache traffic", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+    // Codex here has total === direct; repeating the number would just be noise.
+    expect(screen.queryByText(/7,654,321 incl\. cache/)).toBeNull();
+  });
+
+  it("pins the monthly table cell to direct_tokens, not the cache-inclusive total", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    const { container } = render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+
+    // Column header: pins the label so a copy change doesn't drift unnoticed.
+    expect(screen.getByRole("columnheader", { name: "Direct tokens" })).toBeInTheDocument();
+
+    // The precise regression this branch exists to prevent: if the cell
+    // reverted to `formatTokens(s.total_tokens)`, the claude row would read
+    // "10,734,567" (total_tokens) instead of "1,234,567" (direct_tokens).
+    const firstRow = container.querySelectorAll(".history-table tbody tr")[0];
+    const tokenCell = firstRow.querySelectorAll("td")[2];
+    expect(tokenCell.textContent).toBe("1,234,567");
   });
 
   it("shows empty state when no records", async () => {
@@ -201,6 +248,37 @@ describe("UsageHistoryView", () => {
     await act(async () => { release(HISTORY); });
 
     expect(onLoadingChange).not.toHaveBeenCalled();
+  });
+
+  it("hides the bucket breakdown until the row is expanded", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView />);
+    // The direct-token headline now appears twice (card + table row), so the
+    // load gate uses an unambiguous string instead.
+    await screen.findByText("Download Excel");
+    expect(screen.queryByText("Cache read")).toBeNull();
+
+    // The toggle's accessible name is now its visible content — the glyph is
+    // aria-hidden, so the name is the month, not a generic "Show breakdown"
+    // that would leave every row indistinguishable to a screen reader.
+    const toggles = screen.getAllByRole("button", { name: "2026-07" });
+    expect(toggles[0].getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggles[0]);
+
+    expect(toggles[0].getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Cache read")).toBeTruthy();
+    expect(screen.getByText("9,000,000")).toBeTruthy();
+  });
+
+  it("leaves empty buckets out of the breakdown", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY);
+    render(<UsageHistoryView />);
+    await screen.findByText("Download Excel");
+    // Second row is Codex, whose cache buckets are both zero.
+    const toggles = screen.getAllByRole("button", { name: "2026-07" });
+    fireEvent.click(toggles[1]);
+    expect(screen.queryByText("Cache write")).toBeNull();
+    expect(screen.getByText("Input")).toBeTruthy();
   });
 
   it("marks the download button busy while the export runs", async () => {
