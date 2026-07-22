@@ -1,7 +1,17 @@
 name: Release
 
-# v* 태그(예: v0.1.0)를 push하면 Windows·Linux 설치 파일을 빌드해
+# v* 태그(예: v0.1.0)를 push하면 Windows·macOS·Linux 설치 파일을 빌드해
 # GitHub Release(Draft)에 Assets로 업로드합니다.
+#
+# 잡 구성:
+#   create-release  Draft 릴리스를 하나만 만들고 그 id를 넘긴다
+#   build           플랫폼별로 빌드해 그 id에만 업로드한다
+#   verify          자산과 latest.json이 온전한지 확인한다
+#
+# 빌드 잡이 각자 릴리스를 만들면 자산이 여러 Draft로 갈린다(#54).
+# tauri-action은 릴리스가 없을 때만 만들지만, 매트릭스 잡들이 비슷한 시각에
+# 빌드를 끝내면 서로가 만든 Draft를 보기 전에 각자 만들어 버린다.
+# 그래서 릴리스 생성을 앞단 잡 하나로 분리한다.
 on:
   push:
     tags:
@@ -15,7 +25,95 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+      notes: ${{ steps.changelog.outputs.notes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check tag matches app version
+        shell: bash
+        run: |
+          set -euo pipefail
+          # latest.json의 version은 tauri.conf.json에서 나온다. 태그와 어긋나면
+          # 업데이터가 엉뚱한 버전을 내려보내므로 여기서 먼저 막는다.
+          tag_version="${GITHUB_REF_NAME#v}"
+          conf_version="$(jq -r '.version' src-tauri/tauri.conf.json)"
+          pkg_version="$(jq -r '.version' package.json)"
+          if [ "$tag_version" != "$conf_version" ] || [ "$tag_version" != "$pkg_version" ]; then
+            echo "태그 ${GITHUB_REF_NAME}와 버전이 어긋납니다:" >&2
+            echo "  src-tauri/tauri.conf.json: ${conf_version}" >&2
+            echo "  package.json:              ${pkg_version}" >&2
+            exit 1
+          fi
+          echo "버전 ${tag_version} 확인"
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # CHANGELOG.md에서 "## [<version>]" 헤딩 아래 내용을
+          # 다음 버전 헤딩 또는 링크 참조 정의 직전까지 추출한다.
+          section="$(awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { cap=1; next }
+            cap && /^## \[/ { exit }
+            cap && /^\[[^]]+\]: / { exit }
+            cap { print }
+          ' CHANGELOG.md)"
+          if [ -z "$(printf '%s' "$section" | tr -d '[:space:]')" ]; then
+            section="이 버전의 변경 사항은 [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)를 참고하세요."
+          fi
+          {
+            echo "notes<<CHANGELOG_EOF"
+            echo "${section}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### ⬇️ 다운로드"
+            echo "아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요."
+            echo ""
+            echo "- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일"
+            echo "- **macOS**: \`.dmg\` 또는 \`.app.tar.gz\`"
+            echo "- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`"
+            echo ""
+            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.changelog.outputs.notes }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          # 재실행 대비: 같은 태그의 릴리스가 이미 있으면 새로 만들지 않고 재사용한다.
+          # Draft는 태그로 조회할 수 없어(getReleaseByTag는 404) 목록에서 찾는다.
+          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name == \"${tag}\")] | first | .id // empty")"
+          if [ -n "$release_id" ]; then
+            echo "기존 릴리스 #${release_id} 재사용"
+          else
+            release_id="$(jq -n \
+              --arg tag "$tag" \
+              --arg name "token-usage-app ${tag}" \
+              --arg body "$NOTES" \
+              '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false}' \
+              | gh api "repos/${GITHUB_REPOSITORY}/releases" --method POST --input - --jq '.id')"
+            echo "Draft 릴리스 #${release_id} 생성"
+          fi
+          echo "release_id=${release_id}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -69,50 +167,46 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Extract release notes from CHANGELOG
-        id: changelog
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          # CHANGELOG.md에서 "## [<version>]" 헤딩 아래 내용을
-          # 다음 버전 헤딩 또는 링크 참조 정의 직전까지 추출한다.
-          section="$(awk -v ver="$version" '
-            $0 ~ "^## \\[" ver "\\]" { cap=1; next }
-            cap && /^## \[/ { exit }
-            cap && /^\[[^]]+\]: / { exit }
-            cap { print }
-          ' CHANGELOG.md)"
-          if [ -z "$(printf '%s' "$section" | tr -d '[:space:]')" ]; then
-            section="이 버전의 변경 사항은 [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)를 참고하세요."
-          fi
-          {
-            echo "notes<<CHANGELOG_EOF"
-            echo "${section}"
-            echo ""
-            echo "---"
-            echo ""
-            echo "### ⬇️ 다운로드"
-            echo "아래 Assets에서 플랫폼에 맞는 설치 파일을 내려받으세요."
-            echo ""
-            echo "- **Windows**: \`.msi\` 또는 \`.exe\`(NSIS) 설치 파일"
-            echo "- **macOS**: \`.dmg\` 또는 \`.app.tar.gz\`"
-            echo "- **Linux**: \`.AppImage\`, \`.deb\`, \`.rpm\`"
-            echo ""
-            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build and release Tauri app
+      - name: Build and upload Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'token-usage-app v__VERSION__'
-          releaseBody: ${{ steps.changelog.outputs.notes }}
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
+          # 릴리스 생성은 create-release가 이미 했다. 여기서는 그 릴리스에
+          # 업로드만 한다 — tagName을 주면 잡마다 릴리스를 만들 수 있다(#54).
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          # latest.json의 notes로 들어간다.
+          releaseBody: ${{ needs.create-release.outputs.notes }}
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}
+
+  verify:
+    needs: [create-release, build]
+    runs-on: ubuntu-22.04
+    # Draft 릴리스는 push 권한이 있어야 조회된다.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # 잡이 모두 success여도 자산이 갈리거나 빠질 수 있다. 게시 전에 잡는다.
+          status=0
+          output="$(scripts/verify-release-assets.sh "${GITHUB_REF_NAME}" 2>&1)" || status=$?
+          printf '%s\n' "$output"
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY_EOF
+          ### 릴리스 자산 검사
+
+          ~~~
+          ${output}
+          ~~~
+          SUMMARY_EOF
+          exit "$status"

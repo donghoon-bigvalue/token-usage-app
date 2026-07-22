@@ -23,9 +23,19 @@
 
 ## 릴리스 흐름
 
-`v*` 태그를 push하면 `.github/workflows/release.yml`이 Windows·Linux·macOS 빌드를 돌려
-서명된 설치 파일과 `latest.json`을 **Draft** 릴리스에 올립니다. 내용을 확인한 뒤 릴리스를
-**Publish**해야 사용자에게 업데이트가 배포됩니다.
+`v*` 태그를 push하면 `.github/workflows/release.yml`이 잡 3개를 순서대로 돌립니다.
+
+1. `create-release` — 태그와 앱 버전이 같은지 확인하고 **Draft** 릴리스를 하나 만듭니다.
+2. `build` — Windows·Linux·macOS를 빌드해 **그 릴리스에만** 서명된 설치 파일과
+   `latest.json`을 올립니다.
+3. `verify` — 자산 14개와 `latest.json`의 플랫폼 키 11개가 모두 있는지 확인합니다.
+
+세 잡이 모두 초록불이면 내용을 확인한 뒤 릴리스를 **Publish**해야 사용자에게 업데이트가
+배포됩니다. 게시 전에 직접 확인하려면:
+
+```bash
+scripts/verify-release-assets.sh v1.0.7
+```
 
 앱이 조회하는 엔드포인트는 다음 한 곳입니다.
 
@@ -45,6 +55,14 @@ https://github.com/donghoon-bigvalue/token-usage-app/releases/latest/download/la
   복구는 위 `gh secret set`을 다시 실행한 뒤 `gh run rerun <run-id> --failed`.
 
 - **릴리스 전 점검** — `gh secret list`로 두 시크릿이 모두 있는지 먼저 확인하세요.
+
+- **자산이 여러 Draft로 갈림** — v1.0.6까지는 빌드 잡이 각자 릴리스를 만들 수 있어
+  자산이 두 Draft로 나뉘었습니다([#54](https://github.com/donghoon-bigvalue/token-usage-app/issues/54)).
+  잡은 모두 success라 눈에 띄지 않고, `latest.json`에 빠진 플랫폼은 자동 업데이트가
+  조용히 멈춥니다. 지금은 `create-release` 잡이 릴리스를 하나만 만들고 `verify` 잡이
+  자산 구성을 확인하므로, 같은 일이 생기면 워크플로가 빨간불로 알려 줍니다.
+  이미 갈린 뒤라면 한쪽으로 자산을 모으고 `latest.json`의 `platforms` 맵을 합친 뒤
+  나머지 Draft를 지우세요.
 
 - **개인키 분실** — 기존 사용자에게 업데이트를 내보낼 수 없습니다. pubkey를 바꾼 새 빌드는
   구버전이 서명 검증에 실패하므로 수동 재설치를 안내해야 합니다. 키 파일을 백업해 두세요.
