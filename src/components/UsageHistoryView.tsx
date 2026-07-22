@@ -165,7 +165,7 @@ export default function UsageHistoryView({
             const buckets: Array<[string, number]> = [
               ["bucketInput", s.input_tokens],
               ["bucketOutput", s.output_tokens],
-              ["bucketCacheRead", s.cache_read_tokens],
+              [s.provider === "codex" ? "bucketCachedInput" : "bucketCacheRead", s.cache_read_tokens],
               ["bucketCacheWrite", s.cache_write_tokens],
               ["bucketTotal", s.total_tokens],
             ];
