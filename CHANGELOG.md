@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+### Internal
+- 릴리스 워크플로가 Draft 릴리스를 하나만 만들도록 `create-release` 잡을 분리했습니다 (#54)
+  - 이전에는 플랫폼별 빌드 잡이 각자 Draft를 만들어 자산이 갈릴 수 있었습니다
+    (Windows·macOS 설치 파일이 빠진 릴리스, `latest.json` 플랫폼 키 누락으로 인한
+    자동 업데이트 중단)
+  - 게시 전에 자산 14개와 `latest.json` 플랫폼 키 11개를 확인하는 `verify` 잡을 추가했습니다
+    (`scripts/verify-release-assets.sh`로 직접 실행 가능)
+  - 태그와 `tauri.conf.json`·`package.json`의 버전이 어긋나면 빌드 전에 실패합니다
+
 ## [1.0.6] - 2026-07-22
 
 꼭 필요한 경우 앱이 업데이트를 안내하고 붙잡아 둘 수 있게 됐습니다.
