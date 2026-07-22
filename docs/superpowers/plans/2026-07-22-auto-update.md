@@ -923,6 +923,14 @@ describe("auto update check", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
+
+  it("stays silent when the startup check fails", async () => {
+    (checkForUpdate as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
+    render(<App />);
+    await waitFor(() => expect(checkForUpdate).toHaveBeenCalled());
+    // 조용한 자동 체크 실패는 모달을 띄우지 않는다.
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 ```
 (이미 `render`, `waitFor`, `App`, `describe`, `it`, `vi`, `beforeEach`가 import되어 있다고 가정한다. 없으면 상단 import에 추가한다.)
@@ -947,9 +955,12 @@ import {
 } from "./lib/updater-store";
 ```
 
-컴포넌트 본문 상단(다른 `useState`들 근처)에 훅 추가:
+컴포넌트 본문 상단(다른 `useState`들 근처)에 훅과 관여 플래그 추가:
 ```tsx
   const updater = useUpdater();
+  // 사용자가 '자동 업데이트'를 눌러 관여했는지. 시작 시 자동 체크의 조용한 실패와
+  // 사용자가 유발한 설치 실패를 구분해, 후자에서만 오류 모달을 띄운다.
+  const [updateEngaged, setUpdateEngaged] = useState(false);
 ```
 
 새 `useEffect` 추가 (초기 로드 effect 근처, 의존성 배열은 `[]` — 마운트 1회):
@@ -963,20 +974,23 @@ import {
   }, []);
 ```
 
-렌더 트리 최상단(반환 JSX의 루트 요소 안 첫 자식)에 다이얼로그 추가. 단, 자동 팝업은 `dismissedVersion`과 다를 때만 노출한다:
+렌더 트리 최상단(반환 JSX의 루트 요소 안 첫 자식)에 다이얼로그 추가. 시작 시 자동 체크는 **조용해야** 하므로, 자동 경로에서는 `available`(미-dismiss)·`downloading`·`installed`, 그리고 사용자가 관여한 뒤의 `error`만 모달로 띄운다. `checking`/`upToDate`와 **조용한 체크 실패**(오프라인·최초 릴리스 전 404 등)는 표시하지 않는다:
 ```tsx
       {(() => {
         const s = updater.state;
-        const suppressed =
-          s.kind === "available" && !shouldPrompt(s.info.version, getDismissedVersion());
-        return suppressed ? null : (
+        const show =
+          (s.kind === "available" && shouldPrompt(s.info.version, getDismissedVersion())) ||
+          s.kind === "downloading" ||
+          s.kind === "installed" ||
+          (s.kind === "error" && updateEngaged);
+        return show ? (
           <UpdateDialog
             state={s}
-            onInstall={updater.install}
-            onDismiss={updater.dismiss}
+            onInstall={() => { setUpdateEngaged(true); updater.install(); }}
+            onDismiss={() => { setUpdateEngaged(false); updater.dismiss(); }}
             onRelaunch={updater.relaunch}
           />
-        );
+        ) : null;
       })()}
 ```
 
