@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   checkForUpdate,
   installUpdate,
@@ -18,11 +18,16 @@ export type UpdaterState =
 
 export function useUpdater() {
   const [state, setState] = useState<UpdaterState>({ kind: "idle" });
+  // check()가 받은 업데이트를 install()/dismiss()가 동기적으로 읽도록 ref에 보관한다.
+  // setState 콜백으로 상태를 되읽는 방식은 React 19에서 updater가 호출 시점이 아닌
+  // 이후 렌더에서 실행될 수 있어 신뢰할 수 없다.
+  const infoRef = useRef<UpdateInfo | null>(null);
 
   const check = useCallback(async () => {
     setState({ kind: "checking" });
     try {
       const info = await checkForUpdate();
+      infoRef.current = info;
       setState(info ? { kind: "available", info } : { kind: "upToDate" });
     } catch (e) {
       setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
@@ -30,39 +35,22 @@ export function useUpdater() {
   }, []);
 
   const install = useCallback(async () => {
-    setState((s) =>
-      s.kind === "available" || s.kind === "downloading"
-        ? { kind: "downloading", info: s.info, fraction: 0 }
-        : s
-    );
+    const info = infoRef.current;
+    if (!info) return;
+    setState({ kind: "downloading", info, fraction: 0 });
     try {
-      const info = await getActiveInfo();
-      if (!info) return;
       await installUpdate(info, (fraction) =>
-        setState((s) =>
-          s.kind === "downloading" ? { ...s, fraction } : s
-        )
+        setState((s) => (s.kind === "downloading" ? { ...s, fraction } : s))
       );
       setState({ kind: "installed" });
     } catch (e) {
       setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
     }
-
-    function getActiveInfo(): UpdateInfo | null {
-      let found: UpdateInfo | null = null;
-      setState((s) => {
-        if (s.kind === "downloading" || s.kind === "available") found = s.info;
-        return s;
-      });
-      return found;
-    }
   }, []);
 
   const dismiss = useCallback(() => {
-    setState((s) => {
-      if (s.kind === "available") setDismissedVersion(s.info.version);
-      return { kind: "idle" };
-    });
+    if (infoRef.current) setDismissedVersion(infoRef.current.version);
+    setState({ kind: "idle" });
   }, []);
 
   const relaunch = useCallback(async () => {
