@@ -7,15 +7,26 @@
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-07-22
+
+꼭 필요한 경우 앱이 업데이트를 안내하고 붙잡아 둘 수 있게 됐습니다.
+
 ### Added
-- **강제 업데이트 (킬 스위치)** — 별도 config 저장소의 `force-update.json`에서
-  `minimumVersion`을 올리면, 그 미만 버전은 닫을 수 없는 업데이트 팝업을 띄우고
-  릴리스 페이지로 바로 가는 `[다운로드 페이지 열기]` 버튼을 제공 (#49)
-  - 앱 릴리스 없이 이미 배포된 구버전을 사후에 차단할 수 있음
-  - 정책 확인은 시작할 때마다 실행 (하루 1회 업데이트 확인 스로틀과 무관)
-  - "다음에 하기"가 사라지고, 이전에 dismiss한 버전이라도 다시 표시
-  - 받을 업데이트가 없거나 확인이 실패하면 다운로드 페이지 안내만 표시
-  - 정책 조회 실패는 fail-open — 오프라인·404는 강제하지 않음
+- **강제 업데이트 안내** — 반드시 업데이트가 필요한 상황에서 닫을 수 없는 안내 창을
+  띄우고, 릴리스 페이지로 바로 가는 `[다운로드 페이지 열기]` 버튼을 제공합니다 (#49)
+  - 새 버전이 준비돼 있으면 창 안에서 바로 `[자동 업데이트]`도 할 수 있습니다
+  - 받을 업데이트가 아직 없거나 확인에 실패하면 다운로드 페이지 안내만 표시합니다
+  - 이전에 '다음에 하기'로 넘긴 버전이라도 다시 표시됩니다
+
+### Internal
+- 강제 업데이트 여부를 별도 설정 저장소
+  ([token-usage-app-config](https://github.com/donghoon-bigvalue/token-usage-app-config))의
+  `force-update.json`에서 읽습니다 — 앱을 새로 배포하지 않고도 정책을 바꿀 수 있습니다 (#49)
+  - 정책 확인은 앱을 켤 때마다 수행 (하루 1회 업데이트 확인 스로틀과 무관)
+  - 조회 실패(오프라인·404·형식 오류·타임아웃)는 강제하지 않음(fail-open)
+  - 안내 문구를 정책에서 언어별로 덮어쓸 수 있음
+- CSP `connect-src`에 `https://raw.githubusercontent.com` 추가 (#49)
+- 개발 빌드 전용 업데이트 팝업 미리보기 추가 — 프로덕션 번들에는 포함되지 않음 (#49)
 
 ## [1.0.5] - 2026-07-22
 
@@ -199,7 +210,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.1...v1.0.3
