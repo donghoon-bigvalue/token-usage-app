@@ -283,15 +283,12 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 }
 .update-dialog p { margin: 0 0 10px; color: var(--text); }
 .update-dialog__title { margin: 0 0 8px; font-size: 1.1rem; color: var(--text); }
-.update-dialog__notes {
-  max-height: 160px;
-  overflow: auto;
-  white-space: pre-wrap;
-  font-size: 0.85rem;
-  background: rgba(127, 127, 127, 0.1);
-  padding: 8px;
-  border-radius: 6px;
+.update-dialog__link {
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
 }
+.update-dialog__link:hover { opacity: .8; }
 .update-dialog__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .update-dialog__primary { font-weight: 600; }
 .update-dialog progress { width: 100%; }

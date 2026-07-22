@@ -4,6 +4,9 @@ import i18n from "../i18n";
 import { UpdateDialog } from "./UpdateDialog";
 import type { UpdaterState } from "../lib/useUpdater";
 
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+import { openUrl } from "@tauri-apps/plugin-opener";
+
 const info = { version: "1.1.0", notes: "release notes", update: {} as never };
 
 describe("UpdateDialog", () => {
@@ -11,6 +14,7 @@ describe("UpdateDialog", () => {
   // 이 스위트에서는 활성 언어를 명시적으로 "ko"로 고정한다.
   beforeEach(() => {
     i18n.changeLanguage("ko");
+    vi.clearAllMocks();
   });
 
   it("renders nothing when idle", () => {
@@ -31,6 +35,16 @@ describe("UpdateDialog", () => {
     screen.getByRole("button", { name: "다음에 하기" }).click();
     expect(onInstall).toHaveBeenCalledOnce();
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("opens the releases page from the release-notes link", () => {
+    render(
+      <UpdateDialog state={{ kind: "available", info }} onInstall={() => {}} onDismiss={() => {}} onRelaunch={() => {}} />
+    );
+    screen.getByRole("link", { name: "릴리스 노트" }).click();
+    expect(openUrl).toHaveBeenCalledWith(
+      "https://github.com/donghoon-bigvalue/token-usage-app/releases"
+    );
   });
 
   it("shows progress while downloading", () => {

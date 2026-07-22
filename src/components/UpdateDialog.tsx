@@ -1,5 +1,8 @@
 import { useTranslation } from "react-i18next";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { UpdaterState } from "../lib/useUpdater";
+
+const RELEASES_URL = "https://github.com/donghoon-bigvalue/token-usage-app/releases";
 
 export function UpdateDialog({
   state,
@@ -29,7 +32,15 @@ export function UpdateDialog({
         {state.kind === "available" && (
           <>
             <p>{t("update.available", { version: state.info.version })}</p>
-            {state.info.notes && <pre className="update-dialog__notes">{state.info.notes}</pre>}
+            <p>
+              <a
+                className="update-dialog__link"
+                href={RELEASES_URL}
+                onClick={(e) => { e.preventDefault(); openUrl(RELEASES_URL); }}
+              >
+                {t("update.releaseNotes")}
+              </a>
+            </p>
             <div className="update-dialog__actions">
               <button className="update-dialog__primary" onClick={onInstall}>{t("update.install")}</button>
               <button onClick={onDismiss}>{t("update.later")}</button>
