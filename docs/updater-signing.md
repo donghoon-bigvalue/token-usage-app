@@ -21,6 +21,34 @@
    gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD   # 키 생성 시 비밀번호를 안 걸었으면 빈 값
    ```
 
+## 릴리스 전 체크리스트
+
+태그를 push하고 나면 되돌리기 번거로우니 아래를 먼저 맞춥니다.
+
+1. **버전을 네 곳에서 같이 올립니다.** 전용 릴리스 스크립트는 없고 수동 bump입니다.
+
+   - `package.json` — `"version": "X.Y.Z"`
+   - `src-tauri/tauri.conf.json` — `"version": "X.Y.Z"`
+   - `src-tauri/Cargo.toml` — `[package]` 섹션의 `version = "X.Y.Z"`
+   - `package-lock.json` — `npm install --package-lock-only`로 갱신 (2군데)
+
+   `create-release` 잡은 태그를 `tauri.conf.json`·`package.json` 두 곳하고만 대조합니다.
+   `Cargo.toml`이나 lock 파일이 어긋나도 워크플로는 초록불로 지나갑니다.
+
+2. **테스트를 로컬에서 돌립니다.** CI에는 테스트 잡이 없고 빌드 실패 자체가 게이트입니다.
+
+   ```bash
+   npm test
+   cd src-tauri && cargo test   # WSL에서는 시스템 라이브러리 필요
+   ```
+
+3. **`CHANGELOG.md`에 `## [X.Y.Z]` 섹션**과 하단 링크 참조(`[X.Y.Z]: .../compare/...`)를 추가합니다.
+   `create-release` 잡이 그 헤딩 아래를 릴리스 본문으로 뽑습니다. 섹션이 없어도 실패하지는 않고
+   "CHANGELOG.md를 참고하세요" 한 줄로 대체되므로, 맹탕 릴리스 노트가 조용히 나갑니다.
+
+4. **`gh secret list`로 서명 시크릿 두 개가 있는지 확인합니다.** 없으면 세 플랫폼 잡이
+   빌드를 다 돌린 뒤에야 터집니다(아래 "흔한 실패" 참고).
+
 ## 릴리스 흐름
 
 `v*` 태그를 push하면 `.github/workflows/release.yml`이 잡 3개를 순서대로 돌립니다.
@@ -53,8 +81,6 @@ https://github.com/donghoon-bigvalue/token-usage-app/releases/latest/download/la
 
   Rust 빌드를 6~7분 다 돌린 뒤 번들 단계에서 터지므로 늦게 발견됩니다.
   복구는 위 `gh secret set`을 다시 실행한 뒤 `gh run rerun <run-id> --failed`.
-
-- **릴리스 전 점검** — `gh secret list`로 두 시크릿이 모두 있는지 먼저 확인하세요.
 
 - **자산이 여러 Draft로 갈림** — v1.0.6까지는 빌드 잡이 각자 릴리스를 만들 수 있어
   자산이 두 Draft로 나뉘었습니다([#54](https://github.com/donghoon-bigvalue/token-usage-app/issues/54)).
