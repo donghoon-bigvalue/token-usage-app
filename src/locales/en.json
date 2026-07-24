@@ -1,6 +1,6 @@
 {
   "app": { "title": "Token Usage", "refresh": "Refresh", "settings": "Settings", "close": "Close", "lastUpdated": "Updated {{time}}", "cached": "cached", "loading": "Loading", "loadFailed": "Couldn't load usage", "refreshFailed": "Couldn't refresh — showing the last snapshot", "widget": "Widget" },
-  "provider": { "claude": "Claude", "codex": "Codex", "plan": "Plan", "connect": "Sign in with the {{name}} CLI to see usage", "unavailable": "No data" },
+  "provider": { "claude": "Claude", "codex": "Codex", "plan": "Plan", "connect": "Sign in with the {{name}} CLI to see usage", "retrying": "Couldn't load right now — retrying", "unavailable": "No data" },
   "window": {
     "claude_session": "Current session",
     "claude_weekly_all": "Current week (all models)",

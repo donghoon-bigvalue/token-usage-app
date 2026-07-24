@@ -12,8 +12,15 @@ export function onUsageUpdated(cb: (r: UsageReport) => void): Promise<UnlistenFn
 
 // The generic message the backend surfaces when a provider has no usable
 // credentials (missing file, or a refresh that couldn't recover a 401). This is
-// the only error that should collapse a card to the sign-in prompt.
-const AUTH_ERROR = "credentials not found";
+// the only error that should collapse a card to the sign-in prompt — every other
+// error is transient and must not tell an already-signed-in user to log in.
+export const AUTH_ERROR = "credentials not found";
+
+// True only for the genuine "you need to sign in" case. A transient failure
+// (network blip at launch, 5xx, rate limit) is NOT an auth error.
+export function isAuthError(snapshot: { error: string | null }): boolean {
+  return snapshot.error === AUTH_ERROR;
+}
 
 function mergeSnapshot(prev: UsageSnapshot | undefined, next: UsageSnapshot): UsageSnapshot {
   // Preserve the last successful snapshot across a *transient* failure (rate

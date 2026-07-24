@@ -1,7 +1,10 @@
 import { useTranslation } from "react-i18next";
 import type { UsageSnapshot } from "../lib/types";
+import { isAuthError } from "../lib/usage";
 import { LimitBar } from "./LimitBar";
 import { EmptyState } from "./EmptyState";
+import { SkeletonBars } from "./SkeletonBars";
+import { Spinner } from "./Spinner";
 
 export function ProviderCard({
   snapshot,
@@ -30,7 +33,22 @@ export function ProviderCard({
         )}
       </header>
       {snapshot.error ? (
-        <EmptyState providerName={providerName} />
+        // Only a genuine auth error asks the user to sign in. A transient
+        // failure (a network blip at launch, a 5xx, a rate limit) must not —
+        // the user is already signed in; the poller and next refresh recover.
+        // For that case, show shimmering bars + a "retrying" caption: it reads
+        // as work-in-progress and reserves the real bars' height, so data swaps
+        // in without shifting the layout.
+        isAuthError(snapshot) ? (
+          <EmptyState providerName={providerName} />
+        ) : (
+          <div role="status">
+            <SkeletonBars bars={snapshot.windows.length || (snapshot.provider === "claude" ? 3 : 2)} />
+            <p className="provider-card__retry">
+              <Spinner spinning /> {t("provider.retrying")}
+            </p>
+          </div>
+        )
       ) : (
         <div className="provider-card__bars">
           {snapshot.windows.map((w) => (

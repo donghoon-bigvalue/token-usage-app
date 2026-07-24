@@ -30,6 +30,19 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .provider-card__cached { font-size: 11px; color: var(--muted); border: 1px solid var(--border); padding: 1px 6px; border-radius: 999px; }
 .empty-state { color: var(--muted); font-size: 13px; padding: 12px 0; }
 
+/* The caption under the shimmer bars while a transient failure retries. The
+   divider separates it from the bars, and the (always-on) spinner + muted text
+   read as "working on it", not a dead-end error. */
+.provider-card__retry {
+  display: flex;
+  align-items: center;
+  margin: 10px 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .limit-bar { margin: 10px 0; }
 .limit-bar__row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
 .limit-bar__label { font-weight: 500; }
