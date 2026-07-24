@@ -54,15 +54,20 @@ src-tauri/icons/source/tray-template.svg  단색 마스터 (트레이용)
 src-tauri/icons/*.png .ico .icns          번들 아이콘 세트
 ```
 
-- `scripts/icons/render.ts` — SVG를 정해진 크기의 PNG로 렌더한다. 렌더러는 이미
-  devDependency인 Playwright의 Chromium이므로 새 의존성이 없고, `scripts/screenshots/`와
-  같은 패턴을 따른다.
-- `npm run icons` — 렌더 후 `tauri icon`을 돌려 `src-tauri/icons/` 전체(각 크기 PNG,
-  `icon.ico`, `icon.icns`, Windows Store 타일)를 재생성한다.
+- `scripts/icons/render.ts` — SVG를 정해진 크기의 PNG로 렌더한 뒤 `tauri icon`을 불러
+  번들 세트를 파생시킨다. 렌더러는 이미 devDependency인 Playwright의 Chromium이므로 새
+  의존성이 없고, 외부 명령을 스크립트가 직접 부르는 것은 ffmpeg를 부르는
+  `scripts/screenshots/capture.ts`와 같은 패턴이다.
+- `npm run icons` — 위 스크립트 하나를 돌린다.
 - 생성물은 빌드에 필요하므로 저장소에 커밋한다.
 
-생성이 결정적이어야 한다. 같은 SVG로 `npm run icons`를 두 번 돌리면 산출물이 바이트
-단위로 같아야 하고, 이는 검증 항목이다.
+`tauri icon`은 iOS·Android용 아이콘도 함께 뱉는다. 이 프로젝트에는 모바일 타깃이 없어
+33개 파일이 쓰이지 않은 채 저장소에 쌓이므로, 렌더 스크립트가 생성 직후 지운다.
+
+생성은 `icon.icns`를 뺀 모든 산출물에서 결정적이다. `tauri icon`이 icns 컨테이너에 청크를
+담는 순서가 실행마다 달라져 해시가 바뀌는데, 각 크기의 이미지 데이터 자체는 동일하다.
+순서를 맞추려면 macOS 바이너리 포맷을 손으로 다시 써야 하고 그 결과를 이 환경에서는
+확인할 수 없어, 고치는 대신 사실로 남긴다.
 
 ## 트레이 아이콘
 
@@ -106,7 +111,9 @@ README 최상단 제목 줄에 아이콘을 함께 보인다. `render.ts`가 `do
 
 아이콘은 시각물이라 단위 테스트의 대상이 아니다. 대신 다음을 확인한다.
 
-- `npm run icons`를 두 번 돌려 산출물이 동일한지 (결정적 생성)
+- `npm run icons`를 두 번 돌려 `icon.icns`를 뺀 산출물이 동일한지 (결정적 생성)
+- 번들 아이콘의 링 위 픽셀이 브랜드 색인지, 둥근 모서리가 투명한지 — 파일 목록과 크기만
+  검사하면 옛 아이콘이 그대로 남아 있어도 통과한다
 - 렌더된 16·32·128px PNG를 직접 열어 육안 확인 — 특히 16px에서 두 링이 분리되어 보이는지
 - `npm test` 통과 (기존 테스트 회귀 없음)
 - `cargo check` 통과 (트레이 코드 변경)
