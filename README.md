@@ -1,4 +1,4 @@
-# Token Usage App
+# <img src="docs/images/app-icon.png" width="28" align="top" alt=""> Token Usage App
 
 Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데스크톱 앱**입니다.
 두 서비스의 토큰/사용량 한도와 리셋 시각을 막대 바로 한눈에 보여줍니다.
@@ -170,10 +170,52 @@ sudo apt install ffmpeg fonts-noto-cjk   # GIF 변환 + 한글 폰트
 UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대신* 해당 커맨드 이름과 함께
 실패합니다. `scripts/screenshots/tauri-stub.ts`에 응답을 추가하세요.
 
+## 아이콘 다시 만들기
+
+아이콘의 원본은 `src-tauri/icons/source/`의 SVG 두 장입니다. 컬러 마스터
+(`app-icon.svg`)에서 번들 아이콘 세트와 README 이미지, favicon이 나오고,
+단색 마스터(`tray-template.svg`)는 macOS 메뉴바 전용입니다.
+
+준비물:
+
+```bash
+npx playwright install chromium   # npm ci는 브라우저를 받아오지 않는다
+```
+
+```bash
+npm run icons
+```
+
+Playwright의 Chromium으로 SVG를 PNG로 렌더한 뒤 `tauri icon`이 각 플랫폼의
+크기(`.ico`, `.icns`, Windows Store 타일)를 파생합니다. `tauri icon`은 iOS·Android용
+아이콘도 함께 뱉는데, 이 앱에는 모바일 타깃이 없어 렌더 스크립트가 생성 직후 지웁니다.
+생성물은 빌드에 필요하므로 저장소에 커밋합니다. 색이나 비율을 바꾸려면 SVG만 고치고 이 명령을 다시 돌리세요 —
+`src-tauri/icons/`의 파일을 손으로 고치면 다음 재생성 때 덮어써집니다.
+
+> **아이콘만 바꾸면 `tauri dev`에 반영되지 않습니다.**
+> 창·작업표시줄·트레이 아이콘은 컴파일 시점에 실행 파일 안으로 들어갑니다. 그런데
+> `tauri-build`는 `tauri.conf.json`과 프런트엔드 산출물에만 재빌드 신호를 걸고 아이콘
+> 파일에는 걸지 않아서, 아이콘만 바뀌면 cargo가 재컴파일할 이유를 찾지 못합니다. 새
+> 아이콘을 보려면 Rust 쪽을 한 번 건드려 재컴파일을 유도하세요:
+>
+> ```bash
+> npm run icons
+> touch src-tauri/src/lib.rs
+> npm run tauri dev
+> ```
+>
+> 그래도 예전 아이콘이 보인다면 창 아이콘이 아니라 데스크톱 환경의 아이콘 캐시입니다.
+> 실행 중인 인스턴스를 모두 닫고 다시 띄워 보세요.
+
+`npm run icons` 뒤 `git status`에 `icon.icns`만 수정됨으로 뜨는 것은 정상입니다.
+`tauri icon`이 icns 컨테이너의 청크 순서를 실행마다 다르게 잡을 뿐, 각 크기의 이미지는
+같습니다. 그대로 되돌리면 됩니다.
+
 ## 문서
 
 - 설계 문서: `docs/superpowers/specs/2026-07-14-token-usage-app-design.md`
 - 구현 계획: `docs/superpowers/plans/2026-07-14-token-usage-app.md`
+- 아이콘 설계: `docs/superpowers/specs/2026-07-24-app-icon-design.md`
 - 업데이트 서명 키 · 릴리스 셋업(유지관리자용): [`docs/updater-signing.md`](docs/updater-signing.md)
 - 강제 업데이트 정책 저장소: [donghoon-bigvalue/token-usage-app-config](https://github.com/donghoon-bigvalue/token-usage-app-config)
   — `force-update.json`으로 관리하며, 형식은 [`docs/force-update.example.json`](docs/force-update.example.json) 참고

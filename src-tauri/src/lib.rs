@@ -78,10 +78,22 @@ pub fn run() {
                         }
                     }
                 });
-            // Only set the icon if one is bundled; a missing icon shouldn't
-            // panic app startup.
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
+            // macOS 메뉴바는 단색 템플릿 아이콘이 관례라 컬러 아이콘은 주변과 어긋난다.
+            // 이미지는 컴파일 시점에 실행 파일에 박아 넣는다 — 런타임에 경로로 읽으면
+            // 번들 리소스로 따로 실어야 하고, 그 배선이 빠지면 배포본에서만 깨진다.
+            #[cfg(target_os = "macos")]
+            {
+                tray = tray
+                    .icon(tauri::include_image!("icons/tray/tray-template.png"))
+                    .icon_as_template(true);
+            }
+            // 다른 플랫폼은 창 아이콘을 그대로 쓴다. 아이콘이 없을 때 시작이 죽지
+            // 않도록 하는 방어는 유지한다.
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(icon) = app.default_window_icon() {
+                    tray = tray.icon(icon.clone());
+                }
             }
             let _tray = tray.build(app)?;
 
