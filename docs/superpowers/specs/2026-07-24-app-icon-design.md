@@ -77,9 +77,11 @@ Windows·Linux는 컬러 아이콘이 자연스럽지만, macOS 메뉴바는 단
   두 값이 구분되게 그린다.
 - 그 외 플랫폼: 지금처럼 창 아이콘을 재사용한다.
 
-템플릿 아이콘은 `tauri icon`의 산출물이 아니므로 `render.ts`가 직접 만든다. macOS
-메뉴바 기준 크기에 맞춰 `src-tauri/icons/tray/tray-template.png`(22×22)와
-`tray-template@2x.png`(44×44) 두 장을 낸다.
+템플릿 아이콘은 `tauri icon`의 산출물이 아니므로 `render.ts`가 직접 만든다. Tauri의
+트레이 API는 이미지를 한 장만 받고 macOS에서 메뉴바 높이에 맞춰 축소하므로,
+`src-tauri/icons/tray/tray-template.png` 한 장을 레티나 기준 44×44로 낸다. 이미지는
+`tauri::include_image!`로 컴파일 시점에 실행 파일에 박아 넣는다 — 런타임에 경로로 읽으면
+번들 리소스로 따로 실어야 하고, 그 배선이 빠지면 배포본에서만 조용히 실패한다.
 
 아이콘이 없을 때 시작이 죽지 않도록 하는 기존의 방어(`if let Some(icon)`)는 유지한다.
 
