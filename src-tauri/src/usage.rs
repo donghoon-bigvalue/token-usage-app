@@ -1,11 +1,11 @@
 use crate::model::{LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
 use crate::providers::{claude, codex};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UsageReport {
     pub claude: UsageSnapshot,
     pub codex: UsageSnapshot,

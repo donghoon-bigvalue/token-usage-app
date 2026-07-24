@@ -3,6 +3,7 @@ mod pricing;
 mod providers;
 mod settings;
 mod usage;
+mod usage_cache;
 mod commands;
 mod history;
 mod xlsx;
