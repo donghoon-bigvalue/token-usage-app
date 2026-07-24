@@ -181,8 +181,9 @@ npm run icons
 ```
 
 Playwright의 Chromium으로 SVG를 PNG로 렌더한 뒤 `tauri icon`이 각 플랫폼의
-크기(`.ico`, `.icns`, Windows Store 타일)를 파생합니다. 생성물은 빌드에 필요하므로
-저장소에 커밋합니다. 색이나 비율을 바꾸려면 SVG만 고치고 이 명령을 다시 돌리세요 —
+크기(`.ico`, `.icns`, Windows Store 타일)를 파생합니다. `tauri icon`은 iOS·Android용
+아이콘도 함께 뱉는데, 이 앱에는 모바일 타깃이 없어 렌더 스크립트가 생성 직후 지웁니다.
+생성물은 빌드에 필요하므로 저장소에 커밋합니다. 색이나 비율을 바꾸려면 SVG만 고치고 이 명령을 다시 돌리세요 —
 `src-tauri/icons/`의 파일을 손으로 고치면 다음 재생성 때 덮어써집니다.
 
 ## 문서
