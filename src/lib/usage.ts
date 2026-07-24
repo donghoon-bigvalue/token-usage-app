@@ -6,6 +6,10 @@ export function fetchUsage(): Promise<UsageReport> {
   return invoke<UsageReport>("get_usage");
 }
 
+export function fetchCachedUsage(): Promise<UsageReport | null> {
+  return invoke<UsageReport | null>("get_cached_usage");
+}
+
 export function onUsageUpdated(cb: (r: UsageReport) => void): Promise<UnlistenFn> {
   return listen<UsageReport>("usage-updated", (e) => cb(e.payload));
 }

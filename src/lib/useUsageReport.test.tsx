@@ -41,4 +41,22 @@ describe("useUsageReport", () => {
     const { result } = renderHook(() => useUsageReport());
     await waitFor(() => expect(result.current.loadFailed).toBe("cli missing"));
   });
+
+  it("paints the cached report before the live one arrives", async () => {
+    const cached: UsageReport = {
+      claude: { ...report.claude, source: "cache", updated_at: 5 },
+      codex: { ...report.codex, source: "cache", updated_at: 5 },
+    };
+    let releaseLive!: (r: UsageReport) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) => {
+      if (cmd === "get_cached_usage") return Promise.resolve(cached);
+      if (cmd === "get_usage") return new Promise((res) => { releaseLive = res as (r: UsageReport) => void; });
+      return Promise.resolve(null);
+    }) as never);
+
+    const { result } = renderHook(() => useUsageReport());
+    await waitFor(() => expect(result.current.report?.claude.source).toBe("cache"));
+    releaseLive(report);
+    await waitFor(() => expect(result.current.report?.claude.source).toBe("live"));
+  });
 });

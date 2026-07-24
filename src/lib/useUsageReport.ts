@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { fetchUsage, onUsageUpdated, mergeReport } from "./usage";
+import { fetchUsage, fetchCachedUsage, onUsageUpdated, mergeReport } from "./usage";
 import type { UsageReport } from "./types";
 
 export interface UseUsageReport {
@@ -31,6 +31,8 @@ export function useUsageReport(): UseUsageReport {
   );
 
   useEffect(() => {
+    // 디스크 캐시를 먼저 즉시 그린다(있을 때, 그리고 아직 아무것도 없을 때만).
+    fetchCachedUsage().then((c) => { if (c) setReport((prev) => prev ?? c); });
     reload();
     const un = onUsageUpdated(apply);
     return () => { un.then((f) => f()); };
