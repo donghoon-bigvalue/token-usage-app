@@ -35,3 +35,20 @@ export function formatUsd(n: number | null): string {
   if (n === null) return "—";
   return `$${USD.format(n)}`;
 }
+
+/// Human "N ago" for a cached snapshot's age. Coarse on purpose — the badge
+/// only needs to convey freshness, not exact seconds.
+export function formatRelativeAge(
+  epochSeconds: number,
+  nowSeconds: number,
+  locale: "en" | "ko"
+): string {
+  const diff = Math.max(0, nowSeconds - epochSeconds);
+  const min = Math.floor(diff / 60);
+  if (min < 1) return locale === "ko" ? "방금" : "just now";
+  if (min < 60) return locale === "ko" ? `${min}분 전` : `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return locale === "ko" ? `${h}시간 전` : `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return locale === "ko" ? `${d}일 전` : `${d}d ago`;
+}
