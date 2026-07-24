@@ -23,8 +23,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .manage(commands::UsageCache::default())
+        .manage(usage_cache::LastGood::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_usage,
+            commands::get_cached_usage,
             commands::get_settings,
             commands::set_settings,
             commands::get_usage_history,
@@ -34,6 +36,9 @@ pub fn run() {
         ])
         .setup(|app| {
             poller::start(app.handle().clone());
+            // Load the last-good snapshot from disk so get_cached_usage can serve
+            // it the instant the frontend mounts.
+            usage_cache::seed(app.handle());
 
             let show_main_i = MenuItem::with_id(app, "show_main", "메인 창 열기", true, None::<&str>)?;
             let toggle_widget_i =
@@ -113,6 +118,15 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|handle, event| {
+            // Flush the last-good usage snapshot to disk once, as the app exits,
+            // so the next launch can paint it instantly. Full exit is deliberate
+            // (tray "종료") on this tray app; a force-kill skips this and simply
+            // leaves the previous clean-exit cache in place.
+            if let tauri::RunEvent::Exit = event {
+                usage_cache::flush(handle);
+            }
+        });
 }

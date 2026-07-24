@@ -4,7 +4,7 @@ use crate::usage;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_store::StoreExt;
 
@@ -83,6 +83,8 @@ pub fn start(app: AppHandle) {
         loop {
             let settings = load_settings(&app);
             let collected = usage::collect_detailed().await;
+            // Keep the cross-restart cache fresh; flushed to disk on exit.
+            app.state::<crate::usage_cache::LastGood>().update(&collected.report);
             let report = &collected.report;
             let _ = app.emit("usage-updated", report);
 
