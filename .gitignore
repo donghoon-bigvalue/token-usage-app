@@ -14,6 +14,7 @@ dist-ssr
 
 # Tooling state
 .omc
+.superpowers
 
 # Screenshot capture leftovers (video + palette); only survives a failed run
 scripts/screenshots/.tmp
