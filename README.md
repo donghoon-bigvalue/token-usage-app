@@ -1,4 +1,4 @@
-# Token Usage App
+# <img src="docs/images/app-icon.png" width="28" align="top" alt=""> Token Usage App
 
 Claude와 Codex를 구독제로 사용하는 사람을 위한 **Tauri 기반 데스크톱 앱**입니다.
 두 서비스의 토큰/사용량 한도와 리셋 시각을 막대 바로 한눈에 보여줍니다.
@@ -170,10 +170,26 @@ sudo apt install ffmpeg fonts-noto-cjk   # GIF 변환 + 한글 폰트
 UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대신* 해당 커맨드 이름과 함께
 실패합니다. `scripts/screenshots/tauri-stub.ts`에 응답을 추가하세요.
 
+## 아이콘 다시 만들기
+
+아이콘의 원본은 `src-tauri/icons/source/`의 SVG 두 장입니다. 컬러 마스터
+(`app-icon.svg`)에서 번들 아이콘 세트와 README 이미지, favicon이 나오고,
+단색 마스터(`tray-template.svg`)는 macOS 메뉴바 전용입니다.
+
+```bash
+npm run icons
+```
+
+Playwright의 Chromium으로 SVG를 PNG로 렌더한 뒤 `tauri icon`이 각 플랫폼의
+크기(`.ico`, `.icns`, Windows Store 타일)를 파생합니다. 생성물은 빌드에 필요하므로
+저장소에 커밋합니다. 색이나 비율을 바꾸려면 SVG만 고치고 이 명령을 다시 돌리세요 —
+`src-tauri/icons/`의 파일을 손으로 고치면 다음 재생성 때 덮어써집니다.
+
 ## 문서
 
 - 설계 문서: `docs/superpowers/specs/2026-07-14-token-usage-app-design.md`
 - 구현 계획: `docs/superpowers/plans/2026-07-14-token-usage-app.md`
+- 아이콘 설계: `docs/superpowers/specs/2026-07-24-app-icon-design.md`
 - 업데이트 서명 키 · 릴리스 셋업(유지관리자용): [`docs/updater-signing.md`](docs/updater-signing.md)
 - 강제 업데이트 정책 저장소: [donghoon-bigvalue/token-usage-app-config](https://github.com/donghoon-bigvalue/token-usage-app-config)
   — `force-update.json`으로 관리하며, 형식은 [`docs/force-update.example.json`](docs/force-update.example.json) 참고
