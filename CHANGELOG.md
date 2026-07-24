@@ -7,7 +7,25 @@
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-07-24
+
+앱이 자기 아이콘을 갖게 됐습니다.
+
+### Changed
+- **앱 아이콘 교체** — Tauri 스캐폴딩 기본 아이콘을 앱을 대표하는 이중 링 게이지
+  아이콘으로 바꿨습니다 (#59)
+  - 바깥 링이 Claude, 안쪽 링이 Codex고, 각 링의 채워진 호가 사용량을 뜻합니다
+  - 설치 파일, 독·작업표시줄, 시스템 트레이, 브라우저 탭 favicon이 모두 바뀝니다
+  - macOS 메뉴바는 관례에 맞춰 단색 템플릿 아이콘을 따로 씁니다
+
 ### Internal
+- 아이콘 원본을 `src-tauri/icons/source/`의 SVG 두 장으로 두고, `npm run icons` 한 번으로
+  번들 세트·README 이미지·favicon·트레이 템플릿을 모두 재생성합니다 (#59)
+  - Playwright의 Chromium으로 렌더하므로 새 의존성이 없습니다
+  - 링 색과 트레이 템플릿 내용을 픽셀 단위로 검사하는 테스트를 추가했습니다 — 파일 목록과
+    크기만 보면 옛 아이콘이 남아 있어도 통과하기 때문입니다
+- `index.html`의 favicon(`vite.svg`)과 문서 제목(`Tauri + React + Typescript`) 등
+  스캐폴딩 잔재를 정리하고 미사용 SVG 세 장을 지웠습니다 (#59)
 - 릴리스 워크플로가 Draft 릴리스를 하나만 만들도록 `create-release` 잡을 분리했습니다 (#54)
   - 이전에는 플랫폼별 빌드 잡이 각자 Draft를 만들어 자산이 갈릴 수 있었습니다
     (Windows·macOS 설치 파일이 빠진 릴리스, `latest.json` 플랫폼 키 누락으로 인한
@@ -219,7 +237,8 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.3...v1.0.4
