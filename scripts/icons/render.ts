@@ -32,7 +32,12 @@ type Job = { svg: string; size: number; out: string; why: string };
 const JOBS: Job[] = [
   { svg: COLOR_MASTER, size: 1024, out: `${TMP_DIR}/app-icon-1024.png`, why: "tauri icon 입력" },
   { svg: COLOR_MASTER, size: 128, out: "docs/images/app-icon.png", why: "README" },
-  { svg: TRAY_MASTER, size: 44, out: "src-tauri/icons/tray/tray-template.png", why: "macOS 트레이" },
+  {
+    svg: TRAY_MASTER,
+    size: 36,
+    out: "src-tauri/icons/tray/tray-template.png",
+    why: "tray-icon이 이미지를 메뉴바 높이 18pt로 정규화하므로 레티나 2배인 36px이 정수배로 떨어진다",
+  },
 ];
 
 /**

@@ -5,9 +5,11 @@ import { inflateSync } from "node:zlib";
  * PNG의 IHDR 청크에서 가로·세로를 읽는다. 렌더 결과가 의도한 크기인지 확인하는 데는
  * 이것으로 충분하므로 이미지 라이브러리를 들이지 않는다.
  */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 export async function pngSize(path: string): Promise<{ width: number; height: number }> {
   const buf = await readFile(path);
-  if (buf.length < 24 || buf.readUInt32BE(0) !== 0x89504e47) {
+  if (buf.length < 24 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) {
     throw new Error(`${path}: PNG 파일이 아닙니다.`);
   }
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
@@ -22,7 +24,7 @@ export type Rgba = { r: number; g: number; b: number; a: number };
  */
 export async function pngPixel(path: string, x: number, y: number): Promise<Rgba> {
   const buf = await readFile(path);
-  if (buf.length < 33 || buf.readUInt32BE(0) !== 0x89504e47) {
+  if (buf.length < 33 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) {
     throw new Error(`${path}: PNG 파일이 아닙니다.`);
   }
 
@@ -53,6 +55,18 @@ export async function pngPixel(path: string, x: number, y: number): Promise<Rgba
   const bpp = colorType === 6 ? 4 : 3;
   const stride = width * bpp;
   const raw = inflateSync(Buffer.concat(parts));
+
+  // 압축이 풀린 데이터가 읽으려는 줄까지 못 미치면(중간에서 잘린 PNG) 이후 접근이
+  // undefined + 숫자 → NaN → NaN & 0xff → 0이 되어 조용히 {r:0,g:0,b:0,a:0}을
+  // 돌려준다 — 모서리 투명도 검사 같은 걸 무의미하게 통과시킨다. 미리 막는다.
+  const neededLength = (y + 1) * (stride + 1);
+  if (raw.length < neededLength) {
+    throw new Error(
+      `${path}: 압축 해제된 데이터가 ${y}번째 줄을 읽기에 부족합니다 ` +
+        `(필요 ${neededLength}바이트, 실제 ${raw.length}바이트). 파일이 잘렸을 수 있습니다.`
+    );
+  }
+
   const out = Buffer.alloc(stride * (y + 1));
 
   // 각 줄은 앞줄과 왼쪽 픽셀을 참조하는 필터로 인코딩돼 있어, 원하는 줄까지

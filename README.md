@@ -176,6 +176,12 @@ UI에 새 백엔드 커맨드가 추가되면 캡처가 *조용히 깨지는 대
 (`app-icon.svg`)에서 번들 아이콘 세트와 README 이미지, favicon이 나오고,
 단색 마스터(`tray-template.svg`)는 macOS 메뉴바 전용입니다.
 
+준비물:
+
+```bash
+npx playwright install chromium   # npm ci는 브라우저를 받아오지 않는다
+```
+
 ```bash
 npm run icons
 ```
