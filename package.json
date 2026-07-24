@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "screenshots": "node scripts/screenshots/capture.ts",
+    "icons": "node scripts/icons/render.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

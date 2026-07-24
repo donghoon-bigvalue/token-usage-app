@@ -19,6 +19,9 @@ dist-ssr
 # Screenshot capture leftovers (video + palette); only survives a failed run
 scripts/screenshots/.tmp
 
+# 아이콘 렌더 중간 산출물 (tauri icon 입력)
+scripts/icons/.tmp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
