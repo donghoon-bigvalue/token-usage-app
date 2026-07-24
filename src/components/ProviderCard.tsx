@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { UsageSnapshot } from "../lib/types";
 import { isAuthError } from "../lib/usage";
+import { formatRelativeAge } from "../lib/format";
 import { LimitBar } from "./LimitBar";
 import { EmptyState } from "./EmptyState";
 import { SkeletonBars } from "./SkeletonBars";
@@ -29,7 +30,9 @@ export function ProviderCard({
           </span>
         )}
         {snapshot.source === "cache" && !snapshot.error && (
-          <span className="provider-card__cached">{t("app.cached")}</span>
+          <span className="provider-card__cached">
+            {t("app.cached")} · {formatRelativeAge(snapshot.updated_at, now, locale)}
+          </span>
         )}
       </header>
       {snapshot.error ? (

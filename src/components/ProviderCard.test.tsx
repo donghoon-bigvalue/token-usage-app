@@ -49,8 +49,9 @@ describe("ProviderCard", () => {
     expect(c2.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(2);
   });
 
-  it("shows cached badge", () => {
-    render(wrap(<ProviderCard snapshot={{ ...base, source: "cache" }} now={0} locale="en" />));
-    expect(screen.getByText("cached")).toBeInTheDocument();
+  it("shows the cached badge with the snapshot's age", () => {
+    // updated_at 0, now 300s → "5m ago" that appears with the cache label.
+    render(wrap(<ProviderCard snapshot={{ ...base, source: "cache", updated_at: 0 }} now={300} locale="en" />));
+    expect(screen.getByText(/cached · 5m ago/)).toBeInTheDocument();
   });
 });
