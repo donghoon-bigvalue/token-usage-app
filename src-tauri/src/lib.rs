@@ -35,10 +35,12 @@ pub fn run() {
             commands::toggle_widget,
         ])
         .setup(|app| {
-            poller::start(app.handle().clone());
-            // Load the last-good snapshot from disk so get_cached_usage can serve
-            // it the instant the frontend mounts.
+            // Seed the last-good snapshot from disk BEFORE the poller starts, so
+            // the poller's first update() merges against the seeded value instead
+            // of discarding it, and get_cached_usage can serve it the instant the
+            // frontend mounts.
             usage_cache::seed(app.handle());
+            poller::start(app.handle().clone());
 
             let show_main_i = MenuItem::with_id(app, "show_main", "메인 창 열기", true, None::<&str>)?;
             let toggle_widget_i =

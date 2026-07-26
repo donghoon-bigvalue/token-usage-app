@@ -44,3 +44,21 @@ export function mergeReport(prev: UsageReport | null, next: UsageReport): UsageR
     codex: mergeSnapshot(prev?.codex, next.codex),
   };
 }
+
+// A report where BOTH providers failed — a total cold-start failure with no
+// usable data. The disk cache should still replace this; but a report with any
+// usable provider data must not be clobbered by a (possibly slower) cache read.
+export function isTotalFailure(r: UsageReport | null): boolean {
+  return !!r && !!r.claude.error && !!r.codex.error;
+}
+
+// Decide what to show when the disk-cached snapshot resolves: keep the current
+// report if it already holds usable data (so a faster live result is never
+// overwritten by stale cache), otherwise paint the cache — including replacing
+// a total cold-start failure with the last good snapshot.
+export function applyCachePaint(
+  prev: UsageReport | null,
+  cached: UsageReport
+): UsageReport {
+  return prev && !isTotalFailure(prev) ? prev : cached;
+}
