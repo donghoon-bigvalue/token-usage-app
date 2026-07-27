@@ -1,6 +1,7 @@
 use crate::model::UsageHistory;
 use crate::settings::{sanitize, Settings};
 use crate::usage::{self, UsageReport};
+use crate::usage_cache::LastGood;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri_plugin_store::StoreExt;
@@ -11,6 +12,14 @@ const KEY: &str = "settings";
 #[tauri::command]
 pub async fn get_usage() -> UsageReport {
     usage::collect().await
+}
+
+/// The last successful snapshot held in memory (seeded from disk at startup),
+/// marked as cached. Lets the UI paint instantly on launch before the live
+/// fetch lands. Returns `None` when nothing good has been cached yet.
+#[tauri::command]
+pub fn get_cached_usage(cache: tauri::State<'_, LastGood>) -> Option<UsageReport> {
+    cache.as_cache()
 }
 
 #[tauri::command]

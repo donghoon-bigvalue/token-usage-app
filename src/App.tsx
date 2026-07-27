@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { fetchUsage, onUsageUpdated, mergeReport } from "./lib/usage";
+import { fetchUsage, fetchCachedUsage, onUsageUpdated, mergeReport, applyCachePaint } from "./lib/usage";
 import { getSettings, setSettings } from "./lib/settings";
 import { applyTheme } from "./theme";
 import type { UsageReport, Settings } from "./lib/types";
@@ -58,14 +58,19 @@ export default function App() {
     [applyReport]
   );
 
-  // 초기 로드
+  // 초기 로드: 디스크 캐시를 먼저 즉시 그린 뒤, 라이브 갱신으로 교체.
   useEffect(() => {
     getSettings().then((s) => {
       setSettingsState(s);
       applyTheme(s.theme);
       i18n.changeLanguage(s.language);
     });
-    load();
+    // 더 빠른 라이브 결과를 오래된 캐시로 덮지 않도록 '아직 없을 때만' 채운다.
+    fetchCachedUsage()
+      .then((c) => { if (c) setReport((prev) => applyCachePaint(prev, c)); })
+      .catch(() => {});
+    setLimitsRefreshing(true);
+    load().finally(() => setLimitsRefreshing(false));
     const un = onUsageUpdated(applyReport);
     return () => { un.then((f) => f()); };
   }, [i18n, applyReport, load]);

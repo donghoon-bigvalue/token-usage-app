@@ -19,13 +19,39 @@ describe("ProviderCard", () => {
     expect(container.querySelector(".provider-claude")).toBeTruthy();
   });
 
-  it("shows connect state on error", () => {
-    render(wrap(<ProviderCard snapshot={{ ...base, error: "no creds" }} now={0} locale="en" />));
+  it("shows the sign-in prompt on a genuine auth error", () => {
+    render(wrap(<ProviderCard snapshot={{ ...base, error: "credentials not found" }} now={0} locale="en" />));
     expect(screen.getByText(/Sign in with the Claude CLI/)).toBeInTheDocument();
   });
 
-  it("shows cached badge", () => {
-    render(wrap(<ProviderCard snapshot={{ ...base, source: "cache" }} now={0} locale="en" />));
-    expect(screen.getByText("cached")).toBeInTheDocument();
+  it("shows a retry state — not the sign-in prompt — on a transient error", () => {
+    // A cold-start network blip must not tell an already-signed-in user to log in.
+    const { container } = render(
+      wrap(<ProviderCard snapshot={{ ...base, error: "request failed" }} now={0} locale="en" />),
+    );
+    expect(screen.getByText(/retrying/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Sign in with the Claude CLI/)).not.toBeInTheDocument();
+    // Shimmering bars convey work-in-progress and reserve the real bars' height.
+    expect(container.querySelectorAll(".limit-bar__row--skeleton").length).toBeGreaterThan(0);
+    // The spinner is animated ("↻" with the --on class), not a static glyph.
+    expect(container.querySelector(".provider-card__retry .spinner--on")).not.toBeNull();
+  });
+
+  it("sizes the retry shimmer to the provider's window count even if the errored snapshot has none", () => {
+    // Claude → 3 bars, Codex → 2, so data swaps in without a layout jump.
+    const { container: c1 } = render(
+      wrap(<ProviderCard snapshot={{ ...base, error: "request failed", windows: [] }} now={0} locale="en" />),
+    );
+    expect(c1.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(3);
+    const { container: c2 } = render(
+      wrap(<ProviderCard snapshot={{ ...base, provider: "codex", error: "request failed", windows: [] }} now={0} locale="en" />),
+    );
+    expect(c2.querySelectorAll(".limit-bar__row--skeleton")).toHaveLength(2);
+  });
+
+  it("shows the cached badge with the snapshot's age", () => {
+    // updated_at 0, now 300s → "5m ago" that appears with the cache label.
+    render(wrap(<ProviderCard snapshot={{ ...base, source: "cache", updated_at: 0 }} now={300} locale="en" />));
+    expect(screen.getByText(/cached · 5m ago/)).toBeInTheDocument();
   });
 });

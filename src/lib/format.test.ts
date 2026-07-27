@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { formatCountdown, formatTokens, formatUsd } from "./format";
+import { formatCountdown, formatTokens, formatUsd, formatRelativeAge } from "./format";
 
 describe("formatCountdown", () => {
   it("formats hours and minutes in English", () => {
@@ -69,5 +69,21 @@ describe("number formatting locale", () => {
       spy.mockRestore();
       vi.resetModules();
     }
+  });
+});
+
+describe("formatRelativeAge", () => {
+  const now = 1_000_000;
+  it("says just now under a minute", () => {
+    expect(formatRelativeAge(now - 30, now, "en")).toBe("just now");
+    expect(formatRelativeAge(now - 30, now, "ko")).toBe("방금");
+  });
+  it("counts minutes, hours, and days", () => {
+    expect(formatRelativeAge(now - 300, now, "en")).toBe("5m ago");
+    expect(formatRelativeAge(now - 7200, now, "en")).toBe("2h ago");
+    expect(formatRelativeAge(now - 172_800, now, "ko")).toBe("2일 전");
+  });
+  it("never goes negative for a future timestamp", () => {
+    expect(formatRelativeAge(now + 500, now, "en")).toBe("just now");
   });
 });

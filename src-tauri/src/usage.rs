@@ -1,11 +1,11 @@
 use crate::model::{LimitWindow, ProviderId, Source, UsageSnapshot, WindowId};
 use crate::providers::{claude, codex};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UsageReport {
     pub claude: UsageSnapshot,
     pub codex: UsageSnapshot,
@@ -20,6 +20,41 @@ pub struct UsageReport {
 /// still hit the network.
 static CACHE: LazyLock<Mutex<Option<(Instant, Collected)>>> = LazyLock::new(|| Mutex::new(None));
 const MIN_REFRESH: Duration = Duration::from_secs(5);
+
+/// A collection carrying a *recoverable* error (a cold-start network blip, a
+/// refresh that momentarily 401'd before the token settled) is cached only
+/// briefly — long enough to still coalesce the concurrent startup burst, but
+/// short enough that the next manual refresh or poll retries promptly instead of
+/// being pinned to the stale error for the full `MIN_REFRESH`. Without this, a
+/// transient failure at launch stuck the sign-in prompt on screen for 5s and
+/// forced the user to "refresh a few times" to recover (issue #53).
+const ERROR_REFRESH: Duration = Duration::from_secs(1);
+
+/// The provider `user_message` for genuinely-absent credentials. This error is
+/// *stable* (missing creds won't reappear within seconds), so it keeps the full
+/// TTL; every other error is treated as transient. Kept in sync with the
+/// frontend's `AUTH_ERROR` sentinel so both layers agree on what "sign in" means.
+const AUTH_ERROR: &str = "credentials not found";
+
+/// True when a snapshot failed for a reason worth retrying soon — anything other
+/// than a stable "no credentials" auth error.
+fn is_transient_error(snap: &UsageSnapshot) -> bool {
+    matches!(snap.error.as_deref(), Some(e) if e != AUTH_ERROR)
+}
+
+/// How long this result may be served from the single-flight cache. A rate-limit
+/// keeps the full TTL so rapid manual refreshes can't hammer a 429 (the poller
+/// backs off separately); a transient error gets the short TTL so recovery is
+/// quick; success and a stable auth error keep the full TTL.
+fn cache_ttl(c: &Collected) -> Duration {
+    if !c.rate_limited
+        && (is_transient_error(&c.report.claude) || is_transient_error(&c.report.codex))
+    {
+        ERROR_REFRESH
+    } else {
+        MIN_REFRESH
+    }
+}
 
 /// A collected usage report plus rate-limit scheduling hints for the poller.
 #[derive(Clone)]
@@ -84,7 +119,7 @@ pub async fn collect_detailed() -> Collected {
     // and then observe the just-cached result instead of firing their own request.
     let mut guard = CACHE.lock().await;
     if let Some((at, collected)) = guard.as_ref() {
-        if at.elapsed() < MIN_REFRESH {
+        if at.elapsed() < cache_ttl(collected) {
             return collected.clone();
         }
     }
@@ -118,5 +153,67 @@ mod tests {
         let s = error_snapshot(ProviderId::Claude, "x".into());
         assert_eq!(s.windows.len(), 3);
         assert!(s.windows.iter().any(|w| w.id == WindowId::ClaudeWeeklyFable));
+    }
+
+    fn ok_snap(provider: ProviderId) -> UsageSnapshot {
+        UsageSnapshot {
+            provider,
+            plan: "Max".into(),
+            plan_raw: "max".into(),
+            source: Source::Live,
+            updated_at: 0,
+            windows: vec![],
+            error: None,
+        }
+    }
+
+    fn collected(claude: UsageSnapshot, codex: UsageSnapshot, rate_limited: bool) -> Collected {
+        Collected {
+            report: UsageReport { claude, codex },
+            rate_limited,
+            retry_after_secs: None,
+        }
+    }
+
+    #[test]
+    fn cache_ttl_short_for_transient_error() {
+        // A cold-start network blip surfaces as "request failed" — retry soon.
+        let c = collected(
+            error_snapshot(ProviderId::Claude, "request failed".into()),
+            ok_snap(ProviderId::Codex),
+            false,
+        );
+        assert_eq!(cache_ttl(&c), ERROR_REFRESH);
+    }
+
+    #[test]
+    fn cache_ttl_full_for_success() {
+        let c = collected(ok_snap(ProviderId::Claude), ok_snap(ProviderId::Codex), false);
+        assert_eq!(cache_ttl(&c), MIN_REFRESH);
+    }
+
+    #[test]
+    fn cache_ttl_full_for_stable_auth_error() {
+        // Genuinely-missing credentials are stable — keep the full TTL (burst
+        // protection) rather than re-fetching every second. A Codex-only-absent
+        // user must not lose Claude's coalescing.
+        let c = collected(
+            ok_snap(ProviderId::Claude),
+            error_snapshot(ProviderId::Codex, "credentials not found".into()),
+            false,
+        );
+        assert_eq!(cache_ttl(&c), MIN_REFRESH);
+    }
+
+    #[test]
+    fn cache_ttl_full_when_rate_limited() {
+        // Rate-limit → honor backoff; don't let manual refresh hammer a 429 even
+        // though its message ("request failed") looks transient.
+        let c = collected(
+            error_snapshot(ProviderId::Claude, "request failed".into()),
+            ok_snap(ProviderId::Codex),
+            true,
+        );
+        assert_eq!(cache_ttl(&c), MIN_REFRESH);
     }
 }

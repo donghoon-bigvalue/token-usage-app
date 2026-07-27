@@ -351,6 +351,30 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 
+  it("paints the disk-cached snapshot instantly, then replaces it with the live one", async () => {
+    const cached: UsageReport = {
+      claude: { ...report.claude, source: "cache", updated_at: 5 },
+      codex: { ...report.codex, source: "cache", updated_at: 5 },
+    };
+    let releaseLive!: (r: UsageReport) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string) => {
+      if (cmd === "get_cached_usage") return Promise.resolve(cached);
+      if (cmd === "get_usage") return new Promise((res) => { releaseLive = res as (r: UsageReport) => void; });
+      return defaultInvoke(cmd);
+    }) as never);
+
+    render(<App />);
+    // Cached cards appear before the (still pending) live fetch — no skeleton wait.
+    await screen.findByText("Max 20x");
+    expect(screen.queryByTestId("provider-skeleton")).toBeNull();
+    // The cached badge shows while live is in flight.
+    expect(screen.getAllByText(/cached/i).length).toBeGreaterThan(0);
+
+    releaseLive(report);
+    // Once live lands, the cached badge is gone (source: live).
+    await waitFor(() => expect(screen.queryByText(/cached/i)).toBeNull());
+  });
+
   it("falls back to a dash on the history tab too, when the scan fails — historyBusy must still clear via .finally()", async () => {
     const { container } = render(<App />);
     await screen.findByText("Max 20x");

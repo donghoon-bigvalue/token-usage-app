@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mergeReport } from "./usage";
+import { mergeReport, isTotalFailure, applyCachePaint } from "./usage";
 import type { UsageReport, UsageSnapshot } from "./types";
 
 function snap(over: Partial<UsageSnapshot>): UsageSnapshot {
@@ -51,5 +51,40 @@ describe("mergeReport", () => {
       snap({ provider: "codex", error: "request failed" }),
     );
     expect(mergeReport(null, failed).claude.error).toBe("request failed");
+  });
+});
+
+describe("isTotalFailure", () => {
+  it("is true only when both providers errored", () => {
+    expect(isTotalFailure(null)).toBe(false);
+    expect(isTotalFailure(report(snap({}), snap({ provider: "codex" })))).toBe(false);
+    expect(
+      isTotalFailure(
+        report(snap({ error: "request failed" }), snap({ provider: "codex", error: "request failed" })),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("applyCachePaint", () => {
+  const good = (): UsageReport => report(snap({}), snap({ provider: "codex" }));
+  const totalFail = (): UsageReport =>
+    report(snap({ error: "request failed" }), snap({ provider: "codex", error: "request failed" }));
+
+  it("paints the cache when there is no prior report", () => {
+    const cached = good();
+    expect(applyCachePaint(null, cached)).toBe(cached);
+  });
+  it("keeps a report that still holds usable data (no clobber by a late cache)", () => {
+    const prev = good();
+    expect(applyCachePaint(prev, good())).toBe(prev);
+  });
+  it("keeps a report with one usable provider even if the other errored", () => {
+    const prev = report(snap({}), snap({ provider: "codex", error: "credentials not found" }));
+    expect(applyCachePaint(prev, good())).toBe(prev);
+  });
+  it("replaces a total-failure report with the cache", () => {
+    const cached = good();
+    expect(applyCachePaint(totalFail(), cached)).toBe(cached);
   });
 });
