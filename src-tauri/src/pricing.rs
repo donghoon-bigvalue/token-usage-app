@@ -5,10 +5,6 @@
 //! Rates last verified 2026-08-10 against platform.claude.com/docs/en/pricing and
 //! developers.openai.com/api/docs/pricing. Entries the vendor does not publish are
 //! marked `exact: false` (see [`ModelPricing::exact`]) so the UI can flag them.
-//! A remotely-published table can override any of them — see `pricing_remote`.
-
-use crate::pricing_remote::RemoteTable;
-use std::sync::{LazyLock, RwLock};
 
 /// Per-MTok USD rates for one model.
 #[derive(Debug, Clone, Copy)]
@@ -92,36 +88,6 @@ impl ModelPricing {
 /// `year_month` ("YYYY-MM") drives date-sensitive rates (e.g. Sonnet 5 intro).
 /// Returns None for unknown models so callers can flag "estimate unavailable".
 pub fn pricing_for(model: &str, year_month: &str) -> Option<ModelPricing> {
-    let overlay = OVERLAY.read().unwrap();
-    pricing_for_with(overlay.as_ref(), model, year_month)
-}
-
-/// Process-wide remote overrides, installed once at startup. A global rather
-/// than Tauri managed state because `history::build_history()` is called from
-/// paths that carry no `AppHandle`, and threading one through every call site
-/// to reach a lookup table isn't worth it.
-static OVERLAY: LazyLock<RwLock<Option<RemoteTable>>> = LazyLock::new(|| RwLock::new(None));
-
-/// Replace the remote overrides. Safe to call before or after any lookup — a
-/// lookup simply sees whichever table was installed at the time.
-pub fn install_overlay(table: RemoteTable) {
-    *OVERLAY.write().unwrap() = Some(table);
-}
-
-/// The lookup itself, with the overlay passed in. Pure, so tests don't have to
-/// touch process-wide state.
-pub fn pricing_for_with(
-    overlay: Option<&RemoteTable>,
-    model: &str,
-    year_month: &str,
-) -> Option<ModelPricing> {
-    if let Some(p) = overlay.and_then(|t| t.get(model)) {
-        return Some(p);
-    }
-    built_in(model, year_month)
-}
-
-fn built_in(model: &str, year_month: &str) -> Option<ModelPricing> {
     let m = model.to_ascii_lowercase();
 
     // --- Claude family (cache buckets are separate, non-overlapping) ---
@@ -279,55 +245,6 @@ mod tests {
     fn legacy_sonnet_never_gets_promo() {
         let p = pricing_for("claude-sonnet-4-6", "2026-07").unwrap();
         assert_eq!((p.input, p.output), (3.0, 15.0));
-    }
-
-    // --- Remote overlay (issue #65) ---
-
-    fn overlay(json: &str) -> crate::pricing_remote::RemoteTable {
-        crate::pricing_remote::parse(json).unwrap()
-    }
-
-    #[test]
-    fn overlay_entry_wins_over_the_built_in_table() {
-        let t = overlay(r#"{"models":[{"id":"claude-opus-5","input":7,"output":35}]}"#);
-        let p = pricing_for_with(Some(&t), "claude-opus-5", "2026-08").unwrap();
-        assert_eq!((p.input, p.output), (7.0, 35.0));
-    }
-
-    #[test]
-    fn built_in_table_answers_models_the_overlay_omits() {
-        let t = overlay(r#"{"models":[{"id":"gpt-5.7-nova","input":1,"output":6}]}"#);
-        let p = pricing_for_with(Some(&t), "claude-opus-5", "2026-08").unwrap();
-        assert_eq!((p.input, p.output), (5.0, 25.0), "built-in Opus 5 rate must survive");
-        let n = pricing_for_with(Some(&t), "gpt-5.7-nova", "2026-08").unwrap();
-        assert_eq!((n.input, n.output), (1.0, 6.0), "a model the app has never heard of");
-    }
-
-    #[test]
-    fn an_absent_overlay_behaves_exactly_as_the_built_in_table() {
-        for id in ["claude-opus-5", "gpt-5.6-luna", "claude-sonnet-5", "mystery-model-9"] {
-            let with = pricing_for_with(None, id, "2026-08").map(|p| (p.input, p.output, p.exact));
-            let plain = pricing_for(id, "2026-08").map(|p| (p.input, p.output, p.exact));
-            assert_eq!(with, plain, "{id}");
-        }
-    }
-
-    /// The overlay's `exact` flag has to reach the caller, so a remotely-published
-    /// but unverified rate still renders with the approximate marker.
-    #[test]
-    fn overlay_carries_its_exact_flag_through() {
-        let t = overlay(r#"{"models":[{"id":"claude-opus-5","input":7,"output":35,"exact":false}]}"#);
-        assert!(!pricing_for_with(Some(&t), "claude-opus-5", "2026-08").unwrap().exact);
-    }
-
-    /// Uses an id no built-in branch matches, so mutating the process-wide overlay
-    /// can't perturb any other test.
-    #[test]
-    fn the_installed_overlay_is_what_pricing_for_consults() {
-        assert!(pricing_for("zzz-overlay-probe", "2026-08").is_none());
-        install_overlay(overlay(r#"{"models":[{"id":"zzz-overlay-probe","input":3,"output":9}]}"#));
-        let p = pricing_for("zzz-overlay-probe", "2026-08").unwrap();
-        assert_eq!((p.input, p.output), (3.0, 9.0));
     }
 
     // --- Rates verified against the vendors' published pricing pages, 2026-08-10 ---

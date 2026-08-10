@@ -1,6 +1,5 @@
 mod model;
 mod pricing;
-mod pricing_remote;
 mod providers;
 mod settings;
 mod usage;
@@ -42,13 +41,6 @@ pub fn run() {
             // frontend mounts.
             usage_cache::seed(app.handle());
             poller::start(app.handle().clone());
-
-            // Remote pricing overrides: install last run's cached table first so
-            // costs are right immediately, then refresh in the background. Both
-            // steps are best-effort — the built-in table stands in on failure.
-            pricing_remote::seed(app.handle());
-            let pricing_app = app.handle().clone();
-            tauri::async_runtime::spawn(pricing_remote::refresh(pricing_app));
 
             let show_main_i = MenuItem::with_id(app, "show_main", "메인 창 열기", true, None::<&str>)?;
             let toggle_widget_i =
