@@ -469,6 +469,15 @@ struct ScanUsage {
     cache_creation_input_tokens: u64,
     #[serde(default)]
     cache_read_input_tokens: u64,
+    /// Per-TTL breakdown of `cache_creation_input_tokens`. Absent in older logs.
+    #[serde(default)]
+    cache_creation: Option<ScanCacheCreation>,
+}
+
+#[derive(Deserialize)]
+struct ScanCacheCreation {
+    #[serde(default)]
+    ephemeral_1h_input_tokens: u64,
 }
 
 fn walk_jsonl(dir: &Path) -> Vec<PathBuf> {
@@ -537,6 +546,11 @@ pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
                 input_tokens: usage.input_tokens,
                 output_tokens: usage.output_tokens,
                 cache_write_tokens: usage.cache_creation_input_tokens,
+                cache_write_1h_tokens: usage
+                    .cache_creation
+                    .as_ref()
+                    .map(|c| c.ephemeral_1h_input_tokens)
+                    .unwrap_or(0),
                 cache_read_tokens: usage.cache_read_input_tokens,
                 cached_input_tokens: 0,
             });
@@ -717,6 +731,39 @@ mod tests {
         assert_eq!(r.output_tokens, 20);
         assert_eq!(r.cache_write_tokens, 30);
         assert_eq!(r.cache_read_tokens, 40);
+    }
+
+    /// Claude Code reports the cache-write TTL split in a nested `cache_creation`
+    /// object. The 1-hour portion bills at 2x base input, not 1.25x, so it has to
+    /// survive scanning as its own field (issue #65).
+    #[test]
+    fn scan_usage_splits_out_one_hour_cache_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pdir = home.join("projects/p");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let line = r#"{"type":"assistant","timestamp":"2026-08-01T00:00:00.000Z","message":{"model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":7,"cache_creation":{"ephemeral_1h_input_tokens":80,"ephemeral_5m_input_tokens":20}}}}"#;
+        std::fs::write(pdir.join("s.jsonl"), format!("{line}\n")).unwrap();
+
+        let recs = scan_usage(home);
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].cache_write_tokens, 100);
+        assert_eq!(recs[0].cache_write_1h_tokens, 80);
+    }
+
+    /// Older logs have no `cache_creation` object; those writes stay 5-minute.
+    #[test]
+    fn scan_usage_defaults_one_hour_cache_writes_to_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pdir = home.join("projects/p");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let line = r#"{"type":"assistant","timestamp":"2026-08-01T00:00:00.000Z","message":{"model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":7}}}"#;
+        std::fs::write(pdir.join("s.jsonl"), format!("{line}\n")).unwrap();
+
+        let recs = scan_usage(home);
+        assert_eq!(recs[0].cache_write_tokens, 100);
+        assert_eq!(recs[0].cache_write_1h_tokens, 0);
     }
 
     /// issue #42: the same API response is written to several assistant lines

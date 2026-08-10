@@ -78,11 +78,12 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         let key = (r.year_month.clone(), r.provider, r.model.clone());
         let e = buckets.entry(key).or_insert_with(|| UsageRecord {
             year_month: r.year_month.clone(), provider: r.provider, model: r.model.clone(),
-            input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
+            input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
         });
         e.input_tokens += r.input_tokens;
         e.output_tokens += r.output_tokens;
         e.cache_write_tokens += r.cache_write_tokens;
+        e.cache_write_1h_tokens += r.cache_write_1h_tokens;
         e.cache_read_tokens += r.cache_read_tokens;
         e.cached_input_tokens += r.cached_input_tokens;
     }
@@ -90,10 +91,11 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
     // Details + cost.
     let mut details: Vec<MonthlyDetail> = buckets.into_values().map(|r| {
         let pricing = pricing_for(&r.model, &r.year_month);
+        let cost_exact = pricing.map(|p| p.exact).unwrap_or(false);
         let (total_tokens, cost_usd) = match r.provider {
             ProviderId::Claude => {
                 let total = r.input_tokens + r.output_tokens + r.cache_write_tokens + r.cache_read_tokens;
-                let cost = pricing.map(|p| p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_read_tokens));
+                let cost = pricing.map(|p| p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_write_1h_tokens, r.cache_read_tokens));
                 (total, cost)
             }
             ProviderId::Codex => {
@@ -110,8 +112,11 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         MonthlyDetail {
             year_month: r.year_month, provider: r.provider, model: r.model,
             raw_input_tokens: r.input_tokens, raw_output_tokens: r.output_tokens,
-            raw_cache_write_tokens: r.cache_write_tokens, raw_cache_read_tokens: r.cache_read_tokens,
+            raw_cache_write_tokens: r.cache_write_tokens,
+            raw_cache_write_1h_tokens: r.cache_write_1h_tokens,
+            raw_cache_read_tokens: r.cache_read_tokens,
             raw_cached_input_tokens: r.cached_input_tokens, direct_tokens, total_tokens, cost_usd,
+            cost_exact,
         }
     }).collect();
 
@@ -130,7 +135,12 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         e.cache_read += b.cache_read;
         e.cache_write += b.cache_write;
         match d.cost_usd {
-            Some(c) => e.cost += c,
+            // An inexact rate still contributes a number, but the month can no
+            // longer be shown as a settled total.
+            Some(c) => {
+                e.cost += c;
+                if !d.cost_exact { e.estimable = false; }
+            }
             None => e.estimable = false,
         }
     }
@@ -178,12 +188,63 @@ mod tests {
 
     fn claude_rec(ym: &str, model: &str, i: u64, o: u64, cw: u64, cr: u64) -> UsageRecord {
         UsageRecord { year_month: ym.into(), provider: ProviderId::Claude, model: model.into(),
-            input_tokens: i, output_tokens: o, cache_write_tokens: cw, cache_read_tokens: cr, cached_input_tokens: 0 }
+            input_tokens: i, output_tokens: o, cache_write_tokens: cw, cache_write_1h_tokens: 0, cache_read_tokens: cr, cached_input_tokens: 0 }
+    }
+
+    /// The 1-hour portion has to survive the per-model fold, or every record's
+    /// TTL split is lost and 1h writes get billed at the 5-minute rate (issue #65).
+    #[test]
+    fn aggregate_sums_one_hour_cache_writes_and_prices_them_at_the_1h_rate() {
+        let rec = |cw: u64, cw1h: u64| UsageRecord {
+            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            model: "claude-opus-5".into(), input_tokens: 0, output_tokens: 0,
+            cache_write_tokens: cw, cache_write_1h_tokens: cw1h,
+            cache_read_tokens: 0, cached_input_tokens: 0,
+        };
+        // Two records, 1M cache-write tokens total, all of it 1-hour TTL.
+        let h = aggregate(vec![rec(600_000, 600_000), rec(400_000, 400_000)], "2026-08".into(), 0);
+        let cost = h.details[0].cost_usd.unwrap();
+        assert!((cost - 10.0).abs() < 1e-9, "expected the 1h rate ($10/MTok), got {cost}");
+    }
+
+    /// Manual: reads the real ~/.claude and ~/.codex logs and prints what the app
+    /// would show. Run: cargo test history_smoke -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn history_smoke() {
+        let h = build_history();
+        for s in &h.summaries {
+            println!("{} {:?} ${:.2}{}", s.year_month, s.provider, s.cost_usd.unwrap_or(0.0),
+                     if s.cost_estimable { "" } else { " (approx)" });
+        }
+        let mut inexact: Vec<&str> = h.details.iter()
+            .filter(|d| !d.cost_exact).map(|d| d.model.as_str()).collect();
+        inexact.sort_unstable();
+        inexact.dedup();
+        println!("models priced off a family fallback: {inexact:?}");
+    }
+
+    /// A model priced off its family rather than a verified rate still gets a
+    /// number, but the month must not present it as settled (issue #65).
+    #[test]
+    fn family_fallback_pricing_marks_the_month_inexact() {
+        let h = aggregate(vec![claude_rec("2026-08", "claude-opus-9", 1_000_000, 0, 0, 0)],
+                          "2026-08".into(), 0);
+        assert!(h.summaries[0].cost_usd.is_some(), "a fallback rate still yields a number");
+        assert!(!h.summaries[0].cost_estimable,
+                "a family-fallback rate must flag the month as approximate");
+    }
+
+    #[test]
+    fn verified_pricing_leaves_the_month_estimable() {
+        let h = aggregate(vec![claude_rec("2026-08", "claude-opus-5", 1_000_000, 0, 0, 0)],
+                          "2026-08".into(), 0);
+        assert!(h.summaries[0].cost_estimable);
     }
 
     fn codex_rec(ym: &str, model: &str, i: u64, o: u64, cached: u64) -> UsageRecord {
         UsageRecord { year_month: ym.into(), provider: ProviderId::Codex, model: model.into(),
-            input_tokens: i, output_tokens: o, cache_write_tokens: 0, cache_read_tokens: 0,
+            input_tokens: i, output_tokens: o, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0,
             cached_input_tokens: cached }
     }
 

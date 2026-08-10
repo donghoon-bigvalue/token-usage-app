@@ -22,7 +22,7 @@
     "refreshFailed": "Couldn't refresh — showing the last result",
     "empty": "No usage records yet",
     "estimateNote": "Cost is an API-rate estimate (unrelated to your subscription bill)",
-    "notEstimable": "some model prices unlisted",
+    "notEstimable": "some model rates unlisted or unverified",
     "colMonth": "Month",
     "colProvider": "Service",
     "colTokens": "Direct tokens",

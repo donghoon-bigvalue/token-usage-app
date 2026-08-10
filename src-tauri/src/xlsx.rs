@@ -11,7 +11,7 @@ use crate::model::{MonthlyDetail, ProviderId, UsageHistory};
 /// Sheet name and column labels for one language.
 struct Labels {
     sheet: &'static str,
-    headers: [&'static str; 11],
+    headers: [&'static str; 12],
     total: &'static str,
 }
 
@@ -19,7 +19,8 @@ const EN: Labels = Labels {
     sheet: "Usage",
     headers: [
         "Month", "Provider", "Model", "Input tokens (raw)", "Output tokens (raw)",
-        "Cache write (raw)", "Cache read (raw)", "Cached input (raw)", "Direct tokens",
+        "Cache write (raw)", "Cache write 1h (raw)", "Cache read (raw)", "Cached input (raw)",
+        "Direct tokens",
         "Total tokens", "Cost (USD)",
     ],
     total: "Total",
@@ -29,7 +30,8 @@ const KO: Labels = Labels {
     sheet: "사용량",
     headers: [
         "연월", "서비스", "모델", "입력 토큰(원본)", "출력 토큰(원본)",
-        "캐시 쓰기(원본)", "캐시 읽기(원본)", "캐시 입력(원본)", "직접 사용 토큰",
+        "캐시 쓰기(원본)", "캐시 쓰기 1시간(원본)", "캐시 읽기(원본)", "캐시 입력(원본)",
+        "직접 사용 토큰",
         "전체 토큰", "추정 비용($)",
     ],
     total: "합계",
@@ -43,12 +45,15 @@ fn provider_name(p: ProviderId) -> &'static str {
     }
 }
 
-/// The five raw token columns, the provider-normalized direct total, and the
-/// grand total, in column order.
-fn token_cells(d: &MonthlyDetail) -> [u64; 7] {
+/// The six raw token columns, the provider-normalized direct total, and the
+/// grand total, in column order. `raw_cache_write_1h_tokens` is a *subset* of
+/// `raw_cache_write_tokens`, not an additional bucket — it bills at a higher
+/// rate, so the export shows it alongside rather than folded in.
+fn token_cells(d: &MonthlyDetail) -> [u64; 8] {
     [
         d.raw_input_tokens, d.raw_output_tokens, d.raw_cache_write_tokens,
-        d.raw_cache_read_tokens, d.raw_cached_input_tokens, d.direct_tokens, d.total_tokens,
+        d.raw_cache_write_1h_tokens, d.raw_cache_read_tokens, d.raw_cached_input_tokens,
+        d.direct_tokens, d.total_tokens,
     ]
 }
 
@@ -98,7 +103,7 @@ fn write_sheet(sheet: &mut Worksheet, l: &Labels, history: &UsageHistory) -> Res
             }
             // An unpriced model leaves the cell blank rather than claiming $0.
             if let Some(cost) = d.cost_usd {
-                sheet.write_number_with_format(row, 10, cost, &money)?;
+                sheet.write_number_with_format(row, 11, cost, &money)?;
             }
             row += 1;
         }
@@ -108,12 +113,12 @@ fn write_sheet(sheet: &mut Worksheet, l: &Labels, history: &UsageHistory) -> Res
         sheet.write_string_with_format(row, 0, &head.year_month, &shaded)?;
         sheet.write_string_with_format(row, 1, provider_name(head.provider), &shaded)?;
         sheet.write_string_with_format(row, 2, l.total, &shaded)?;
-        for n in 0..7 {
+        for n in 0..8 {
             let sum: u64 = group.iter().map(|d| token_cells(d)[n]).sum();
             sheet.write_number_with_format(row, 3 + n as u16, sum as f64, &shaded_tokens)?;
         }
         let cost: f64 = group.iter().filter_map(|d| d.cost_usd).sum();
-        sheet.write_number_with_format(row, 10, cost, &shaded_money)?;
+        sheet.write_number_with_format(row, 11, cost, &shaded_money)?;
         row += 1;
 
         i = end;
@@ -135,7 +140,7 @@ mod tests {
         UsageRecord {
             year_month: ym.into(), provider: p, model: model.into(),
             input_tokens: i, output_tokens: o,
-            cache_write_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
+            cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
         }
     }
 
@@ -177,24 +182,25 @@ mod tests {
         assert_eq!(text(&r[0][3]), "Input tokens (raw)");
         assert_eq!(text(&r[0][4]), "Output tokens (raw)");
         assert_eq!(text(&r[0][5]), "Cache write (raw)");
-        assert_eq!(text(&r[0][6]), "Cache read (raw)");
-        assert_eq!(text(&r[0][7]), "Cached input (raw)");
-        assert_eq!(text(&r[0][8]), "Direct tokens");
-        assert_eq!(text(&r[0][9]), "Total tokens");
-        assert_eq!(text(&r[0][10]), "Cost (USD)");
+        assert_eq!(text(&r[0][6]), "Cache write 1h (raw)");
+        assert_eq!(text(&r[0][7]), "Cache read (raw)");
+        assert_eq!(text(&r[0][8]), "Cached input (raw)");
+        assert_eq!(text(&r[0][9]), "Direct tokens");
+        assert_eq!(text(&r[0][10]), "Total tokens");
+        assert_eq!(text(&r[0][11]), "Cost (USD)");
 
         // Detail row: sonnet-5 intro promo at 2026-07: 1M input @$2 + 1M output @$10 = $12.
         assert_eq!(text(&r[1][0]), "2026-07");
         assert_eq!(text(&r[1][1]), "Claude");
         assert_eq!(text(&r[1][2]), "claude-sonnet-5");
-        assert_eq!(num(&r[1][8]), 2_000_000.0);
         assert_eq!(num(&r[1][9]), 2_000_000.0);
-        assert!((num(&r[1][10]) - 12.0).abs() < 1e-9);
+        assert_eq!(num(&r[1][10]), 2_000_000.0);
+        assert!((num(&r[1][11]) - 12.0).abs() < 1e-9);
 
         // Total row closes the (month, provider) group.
         assert_eq!(text(&r[2][2]), "Total");
-        assert_eq!(num(&r[2][9]), 2_000_000.0);
-        assert!((num(&r[2][10]) - 12.0).abs() < 1e-9);
+        assert_eq!(num(&r[2][10]), 2_000_000.0);
+        assert!((num(&r[2][11]) - 12.0).abs() < 1e-9);
         assert_eq!(r.len(), 3);
     }
 
@@ -207,9 +213,9 @@ mod tests {
         let mut wb = open(to_xlsx(&h).unwrap());
         let r = rows(&mut wb, "Usage");
 
-        assert_eq!(num(&r[1][8]), 120.0);
-        assert_eq!(num(&r[1][9]), 5_420.0);
-        assert_eq!(num(&r[2][8]), 120.0);
+        assert_eq!(num(&r[1][9]), 120.0);
+        assert_eq!(num(&r[1][10]), 5_420.0);
+        assert_eq!(num(&r[2][9]), 120.0);
     }
 
     #[test]
@@ -228,8 +234,8 @@ mod tests {
         // Two detail rows, then one total: sonnet (intro promo) $2 + haiku $1 = $3 over 2M tokens.
         assert_eq!(r.len(), 4);
         assert_eq!(text(&r[3][2]), "Total");
-        assert_eq!(num(&r[3][9]), 2_000_000.0);
-        assert!((num(&r[3][10]) - 3.0).abs() < 1e-9);
+        assert_eq!(num(&r[3][10]), 2_000_000.0);
+        assert!((num(&r[3][11]) - 3.0).abs() < 1e-9);
     }
 
     #[test]
@@ -265,17 +271,18 @@ mod tests {
         assert_eq!(text(&ko[0][3]), "입력 토큰(원본)");
         assert_eq!(text(&ko[0][4]), "출력 토큰(원본)");
         assert_eq!(text(&ko[0][5]), "캐시 쓰기(원본)");
-        assert_eq!(text(&ko[0][6]), "캐시 읽기(원본)");
-        assert_eq!(text(&ko[0][7]), "캐시 입력(원본)");
-        assert_eq!(text(&ko[0][8]), "직접 사용 토큰");
-        assert_eq!(text(&ko[0][9]), "전체 토큰");
-        assert_eq!(text(&ko[0][10]), "추정 비용($)");
+        assert_eq!(text(&ko[0][6]), "캐시 쓰기 1시간(원본)");
+        assert_eq!(text(&ko[0][7]), "캐시 읽기(원본)");
+        assert_eq!(text(&ko[0][8]), "캐시 입력(원본)");
+        assert_eq!(text(&ko[0][9]), "직접 사용 토큰");
+        assert_eq!(text(&ko[0][10]), "전체 토큰");
+        assert_eq!(text(&ko[0][11]), "추정 비용($)");
         assert_eq!(text(&ko[2][2]), "합계");
 
         // Same shape, same numbers as the English sheet.
         assert_eq!(ko.len(), en.len());
-        assert_eq!(num(&ko[1][8]), num(&en[1][8]));
-        assert_eq!(num(&ko[2][10]), num(&en[2][10]));
+        assert_eq!(num(&ko[1][9]), num(&en[1][9]));
+        assert_eq!(num(&ko[2][11]), num(&en[2][11]));
     }
 
     #[test]
@@ -283,6 +290,6 @@ mod tests {
         let h = aggregate(vec![rec("2026-07", ProviderId::Claude, "weird-model", 1_000_000, 0)], "2026-07".into(), 1_700_000_000);
         let mut wb = open(to_xlsx(&h).unwrap());
         let r = rows(&mut wb, "Usage");
-        assert!(r[1][10].is_empty(), "unpriced model must not claim a cost, got {:?}", r[1][10]);
+        assert!(r[1][11].is_empty(), "unpriced model must not claim a cost, got {:?}", r[1][11]);
     }
 }

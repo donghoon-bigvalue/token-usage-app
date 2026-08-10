@@ -631,6 +631,7 @@ pub fn scan_usage(codex_home: &Path) -> Vec<UsageRecord> {
                     input_tokens: input,
                     output_tokens: output,
                     cache_write_tokens: 0,
+                    cache_write_1h_tokens: 0,
                     cache_read_tokens: 0,
                     cached_input_tokens: cached,
                 });
