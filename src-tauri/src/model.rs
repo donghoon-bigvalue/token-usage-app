@@ -77,8 +77,18 @@ pub struct UsageRecord {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub cache_write_tokens: u64,
+    /// Portion of `cache_write_tokens` written with a 1-hour TTL (Claude only).
+    /// Billed at 2x base input instead of 1.25x. Zero when the log predates the
+    /// `cache_creation` breakdown, which prices it all at the 5-minute rate.
+    #[serde(default)]
+    pub cache_write_1h_tokens: u64,
     pub cache_read_tokens: u64,
     pub cached_input_tokens: u64,
+    /// Request ran with `speed: "fast"` (Claude only). Fast mode is the same
+    /// model at premium rates, so it prices differently from an otherwise
+    /// identical record. Absent in logs predating the field, which read as false.
+    #[serde(default)]
+    pub fast: bool,
 }
 
 /// One aggregated row: (year_month × provider × model). Used for CSV detail.
@@ -96,6 +106,8 @@ pub struct MonthlyDetail {
     pub raw_input_tokens: u64,
     pub raw_output_tokens: u64,
     pub raw_cache_write_tokens: u64,
+    /// 1-hour-TTL portion of `raw_cache_write_tokens` (Claude only).
+    pub raw_cache_write_1h_tokens: u64,
     pub raw_cache_read_tokens: u64,
     pub raw_cached_input_tokens: u64,
     /// Tokens the user actually spent: input + output with the provider's cache
@@ -104,6 +116,12 @@ pub struct MonthlyDetail {
     pub direct_tokens: u64,
     pub total_tokens: u64,
     pub cost_usd: Option<f64>,
+    /// False when `cost_usd` came from a family-fallback rate rather than a
+    /// verified one. Rolls up into `MonthlySummary::cost_estimable`.
+    pub cost_exact: bool,
+    /// Request ran in fast mode, which bills at premium rates. Part of the
+    /// grouping key, so a model used both ways yields one row of each.
+    pub fast: bool,
 }
 
 /// One summary row: (year_month × provider). Used for the on-screen table.

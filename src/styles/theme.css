@@ -173,6 +173,16 @@ button { cursor: pointer; background: var(--card); color: var(--text); border: 1
 
 .history-note { font-size: 12px; color: var(--muted); margin: 0; }
 
+/* Names the models whose rate the app could not verify, inside a month's
+   expanded breakdown. Muted like the surrounding detail — it is a note, not a
+   failure — but monospaced so ids stay readable. */
+.history-unverified {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .history-table th,
 .history-table td {

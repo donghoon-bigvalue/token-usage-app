@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use crate::model::{
     MonthlyDetail, MonthlySummary, ProviderId, UsageHistory, UsageRecord,
 };
-use crate::pricing::pricing_for;
+use crate::pricing::{fast_mode_pricing, pricing_for};
 
 /// The four buckets the UI shows, normalized so both providers mean the same
 /// thing. Claude reports cache reads in their own field; Codex folds them into
@@ -73,27 +73,36 @@ struct SummaryAcc {
 /// so tests stay deterministic.
 pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i64) -> UsageHistory {
     // Sum raw token buckets.
-    let mut buckets: BTreeMap<(String, ProviderId, String), UsageRecord> = BTreeMap::new();
+    let mut buckets: BTreeMap<(String, ProviderId, String, bool), UsageRecord> = BTreeMap::new();
     for r in records {
-        let key = (r.year_month.clone(), r.provider, r.model.clone());
+        // Fast mode is part of the key: the same model bills differently
+        // depending on it, so the two must not be summed together.
+        let key = (r.year_month.clone(), r.provider, r.model.clone(), r.fast);
         let e = buckets.entry(key).or_insert_with(|| UsageRecord {
             year_month: r.year_month.clone(), provider: r.provider, model: r.model.clone(),
-            input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
+            input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0, fast: r.fast,
         });
         e.input_tokens += r.input_tokens;
         e.output_tokens += r.output_tokens;
         e.cache_write_tokens += r.cache_write_tokens;
+        e.cache_write_1h_tokens += r.cache_write_1h_tokens;
         e.cache_read_tokens += r.cache_read_tokens;
         e.cached_input_tokens += r.cached_input_tokens;
     }
 
     // Details + cost.
     let mut details: Vec<MonthlyDetail> = buckets.into_values().map(|r| {
-        let pricing = pricing_for(&r.model, &r.year_month);
+        // Fast mode is only offered on some models; elsewhere the flag is not a
+        // reason to upcharge, so fall through to the standard rate.
+        let pricing = r.fast
+            .then(|| fast_mode_pricing(&r.model))
+            .flatten()
+            .or_else(|| pricing_for(&r.model, &r.year_month));
+        let cost_exact = pricing.map(|p| p.exact).unwrap_or(false);
         let (total_tokens, cost_usd) = match r.provider {
             ProviderId::Claude => {
                 let total = r.input_tokens + r.output_tokens + r.cache_write_tokens + r.cache_read_tokens;
-                let cost = pricing.map(|p| p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_read_tokens));
+                let cost = pricing.map(|p| p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_write_1h_tokens, r.cache_read_tokens));
                 (total, cost)
             }
             ProviderId::Codex => {
@@ -110,8 +119,11 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         MonthlyDetail {
             year_month: r.year_month, provider: r.provider, model: r.model,
             raw_input_tokens: r.input_tokens, raw_output_tokens: r.output_tokens,
-            raw_cache_write_tokens: r.cache_write_tokens, raw_cache_read_tokens: r.cache_read_tokens,
+            raw_cache_write_tokens: r.cache_write_tokens,
+            raw_cache_write_1h_tokens: r.cache_write_1h_tokens,
+            raw_cache_read_tokens: r.cache_read_tokens,
             raw_cached_input_tokens: r.cached_input_tokens, direct_tokens, total_tokens, cost_usd,
+            cost_exact, fast: r.fast,
         }
     }).collect();
 
@@ -130,7 +142,12 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         e.cache_read += b.cache_read;
         e.cache_write += b.cache_write;
         match d.cost_usd {
-            Some(c) => e.cost += c,
+            // An inexact rate still contributes a number, but the month can no
+            // longer be shown as a settled total.
+            Some(c) => {
+                e.cost += c;
+                if !d.cost_exact { e.estimable = false; }
+            }
             None => e.estimable = false,
         }
     }
@@ -146,7 +163,8 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
     summaries.sort_by(|a, b| b.year_month.cmp(&a.year_month).then(prov_key(&a.provider).cmp(&prov_key(&b.provider))));
     details.sort_by(|a, b| b.year_month.cmp(&a.year_month)
         .then(prov_key(&a.provider).cmp(&prov_key(&b.provider)))
-        .then(a.model.cmp(&b.model)));
+        .then(a.model.cmp(&b.model))
+        .then(a.fast.cmp(&b.fast)));
 
     UsageHistory { current_month, scanned_at, summaries, details }
 }
@@ -178,13 +196,99 @@ mod tests {
 
     fn claude_rec(ym: &str, model: &str, i: u64, o: u64, cw: u64, cr: u64) -> UsageRecord {
         UsageRecord { year_month: ym.into(), provider: ProviderId::Claude, model: model.into(),
-            input_tokens: i, output_tokens: o, cache_write_tokens: cw, cache_read_tokens: cr, cached_input_tokens: 0 }
+            input_tokens: i, output_tokens: o, cache_write_tokens: cw, cache_write_1h_tokens: 0, cache_read_tokens: cr, cached_input_tokens: 0, fast: false }
+    }
+
+    /// The 1-hour portion has to survive the per-model fold, or every record's
+    /// TTL split is lost and 1h writes get billed at the 5-minute rate (issue #65).
+    #[test]
+    fn aggregate_sums_one_hour_cache_writes_and_prices_them_at_the_1h_rate() {
+        let rec = |cw: u64, cw1h: u64| UsageRecord {
+            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            model: "claude-opus-5".into(), input_tokens: 0, output_tokens: 0,
+            cache_write_tokens: cw, cache_write_1h_tokens: cw1h,
+            cache_read_tokens: 0, cached_input_tokens: 0, fast: false,
+        };
+        // Two records, 1M cache-write tokens total, all of it 1-hour TTL.
+        let h = aggregate(vec![rec(600_000, 600_000), rec(400_000, 400_000)], "2026-08".into(), 0);
+        let cost = h.details[0].cost_usd.unwrap();
+        assert!((cost - 10.0).abs() < 1e-9, "expected the 1h rate ($10/MTok), got {cost}");
+    }
+
+    /// Manual: reads the real ~/.claude and ~/.codex logs and prints what the app
+    /// would show. Run: cargo test history_smoke -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn history_smoke() {
+        let h = build_history();
+        for s in &h.summaries {
+            println!("{} {:?} ${:.2}{}", s.year_month, s.provider, s.cost_usd.unwrap_or(0.0),
+                     if s.cost_estimable { "" } else { " (approx)" });
+        }
+        let mut inexact: Vec<&str> = h.details.iter()
+            .filter(|d| !d.cost_exact).map(|d| d.model.as_str()).collect();
+        inexact.sort_unstable();
+        inexact.dedup();
+        println!("models priced off a family fallback: {inexact:?}");
+    }
+
+    /// Fast and standard usage of the same model bill at different rates, so they
+    /// cannot share a bucket — folding them together would price one of them
+    /// wrong whichever rate won (issue #65).
+    #[test]
+    fn fast_and_standard_usage_of_one_model_are_priced_separately() {
+        let rec = |fast: bool| UsageRecord {
+            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            model: "claude-opus-5".into(), input_tokens: 1_000_000, output_tokens: 0,
+            cache_write_tokens: 0, cache_write_1h_tokens: 0,
+            cache_read_tokens: 0, cached_input_tokens: 0, fast,
+        };
+        let h = aggregate(vec![rec(true), rec(false)], "2026-08".into(), 0);
+
+        assert_eq!(h.details.len(), 2, "fast and standard must stay separate rows");
+        let fast = h.details.iter().find(|d| d.fast).unwrap();
+        let std = h.details.iter().find(|d| !d.fast).unwrap();
+        assert!((fast.cost_usd.unwrap() - 10.0).abs() < 1e-9, "fast input is $10/MTok");
+        assert!((std.cost_usd.unwrap() - 5.0).abs() < 1e-9, "standard input is $5/MTok");
+        // The month's total is simply both.
+        assert!((h.summaries[0].cost_usd.unwrap() - 15.0).abs() < 1e-9);
+    }
+
+    /// Fast mode isn't offered on these, so the flag must not upcharge them.
+    #[test]
+    fn a_fast_flag_on_a_model_without_fast_mode_bills_standard() {
+        let h = aggregate(vec![UsageRecord {
+            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            model: "claude-sonnet-5".into(), input_tokens: 1_000_000, output_tokens: 0,
+            cache_write_tokens: 0, cache_write_1h_tokens: 0,
+            cache_read_tokens: 0, cached_input_tokens: 0, fast: true,
+        }], "2026-08".into(), 0);
+        // Sonnet 5 intro input is $2/MTok; fast mode must not double it.
+        assert!((h.details[0].cost_usd.unwrap() - 2.0).abs() < 1e-9);
+    }
+
+    /// A model priced off its family rather than a verified rate still gets a
+    /// number, but the month must not present it as settled (issue #65).
+    #[test]
+    fn family_fallback_pricing_marks_the_month_inexact() {
+        let h = aggregate(vec![claude_rec("2026-08", "claude-opus-9", 1_000_000, 0, 0, 0)],
+                          "2026-08".into(), 0);
+        assert!(h.summaries[0].cost_usd.is_some(), "a fallback rate still yields a number");
+        assert!(!h.summaries[0].cost_estimable,
+                "a family-fallback rate must flag the month as approximate");
+    }
+
+    #[test]
+    fn verified_pricing_leaves_the_month_estimable() {
+        let h = aggregate(vec![claude_rec("2026-08", "claude-opus-5", 1_000_000, 0, 0, 0)],
+                          "2026-08".into(), 0);
+        assert!(h.summaries[0].cost_estimable);
     }
 
     fn codex_rec(ym: &str, model: &str, i: u64, o: u64, cached: u64) -> UsageRecord {
         UsageRecord { year_month: ym.into(), provider: ProviderId::Codex, model: model.into(),
-            input_tokens: i, output_tokens: o, cache_write_tokens: 0, cache_read_tokens: 0,
-            cached_input_tokens: cached }
+            input_tokens: i, output_tokens: o, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0,
+            cached_input_tokens: cached, fast: false }
     }
 
     #[test]

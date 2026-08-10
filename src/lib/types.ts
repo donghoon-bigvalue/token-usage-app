@@ -61,11 +61,17 @@ export interface MonthlyDetail {
   raw_input_tokens: number;
   raw_output_tokens: number;
   raw_cache_write_tokens: number;
+  /** 1-hour-TTL portion of `raw_cache_write_tokens` — bills at 2x input, not 1.25x. */
+  raw_cache_write_1h_tokens: number;
   raw_cache_read_tokens: number;
   raw_cached_input_tokens: number;
   direct_tokens: number;
   total_tokens: number;
   cost_usd: number | null;
+  /** False when the rate came from a family fallback rather than a verified one. */
+  cost_exact: boolean;
+  /** Request ran in fast mode, which bills at premium rates. Its own row. */
+  fast: boolean;
 }
 
 export interface UsageHistory {

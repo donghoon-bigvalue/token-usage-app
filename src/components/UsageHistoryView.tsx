@@ -169,6 +169,13 @@ export default function UsageHistoryView({
               ["bucketCacheWrite", s.cache_write_tokens],
               ["bucketTotal", s.total_tokens],
             ];
+            // Models in this month the app has no verified rate for — either a
+            // generation it's never seen, or one the vendor doesn't publish. The
+            // month's "≈" says something is approximate; this says which model,
+            // which is what makes it actionable (issue #65).
+            const unverified = history.details
+              .filter((d) => d.year_month === s.year_month && d.provider === s.provider && !d.cost_exact)
+              .map((d) => d.model);
             return (
               <Fragment key={key}>
                 <tr>
@@ -202,6 +209,11 @@ export default function UsageHistoryView({
                             </div>
                           ))}
                       </dl>
+                      {unverified.length > 0 && (
+                        <p className="history-unverified">
+                          {t("history.unverifiedModels")}: {unverified.join(", ")}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 )}
