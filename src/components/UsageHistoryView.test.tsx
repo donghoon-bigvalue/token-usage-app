@@ -33,8 +33,50 @@ const HISTORY = {
   details: [],
 };
 
+/** A month whose Codex total leans on a model the app has no verified rate for. */
+const detail = (model: string, cost_exact: boolean) => ({
+  year_month: "2026-07", provider: "codex", model,
+  raw_input_tokens: 100, raw_output_tokens: 10,
+  raw_cache_write_tokens: 0, raw_cache_write_1h_tokens: 0,
+  raw_cache_read_tokens: 0, raw_cached_input_tokens: 0,
+  direct_tokens: 110, total_tokens: 110, cost_usd: 1, cost_exact,
+});
+
+const HISTORY_WITH_UNVERIFIED = {
+  ...HISTORY,
+  summaries: [{ ...HISTORY.summaries[1], cost_estimable: false }],
+  details: [detail("gpt-5.9-unreleased", false), detail("gpt-5.5", true)],
+};
+
 describe("UsageHistoryView", () => {
   beforeEach(() => { getUsageHistory.mockReset(); downloadUsageXlsx.mockReset(); });
+
+  // A month-level "≈" tells the user something is off but not *what*. Naming the
+  // model is what turns it into an action (issue #65).
+  it("names the models it has no verified rate for", async () => {
+    getUsageHistory.mockResolvedValue(HISTORY_WITH_UNVERIFIED);
+    render(<UsageHistoryView />);
+    await waitFor(() => expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0));
+
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { expanded: false })[0]); });
+
+    expect(screen.getByText(/gpt-5\.9-unreleased/)).toBeTruthy();
+    expect(screen.queryByText(/gpt-5\.5/)).toBeNull();
+  });
+
+  it("says nothing about rates when every model in the month is verified", async () => {
+    getUsageHistory.mockResolvedValue({
+      ...HISTORY,
+      summaries: [HISTORY.summaries[1]],
+      details: [detail("gpt-5.5", true)],
+    });
+    render(<UsageHistoryView />);
+    await waitFor(() => expect(screen.getAllByText("2026-07").length).toBeGreaterThan(0));
+
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { expanded: false })[0]); });
+
+    expect(screen.queryByText(/gpt-5\.5/)).toBeNull();
+  });
 
   it("renders monthly summary rows", async () => {
     getUsageHistory.mockResolvedValue(HISTORY);

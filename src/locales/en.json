@@ -23,6 +23,7 @@
     "empty": "No usage records yet",
     "estimateNote": "Cost is an API-rate estimate (unrelated to your subscription bill)",
     "notEstimable": "some model rates unlisted or unverified",
+    "unverifiedModels": "Unverified rates",
     "colMonth": "Month",
     "colProvider": "Service",
     "colTokens": "Direct tokens",
