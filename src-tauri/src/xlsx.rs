@@ -37,6 +37,14 @@ const KO: Labels = Labels {
     total: "합계",
 };
 
+/// Model id as written in the log, marked when the request ran in fast mode.
+/// Fast and standard usage of one model are separate rows priced differently, so
+/// the label has to tell them apart. The suffix is composed here rather than
+/// stored on the detail so `MonthlyDetail::model` stays log-verbatim.
+fn model_label(d: &MonthlyDetail) -> String {
+    if d.fast { format!("{} (fast)", d.model) } else { d.model.clone() }
+}
+
 /// Provider names stay untranslated — they are product names in both locales.
 fn provider_name(p: ProviderId) -> &'static str {
     match p {
@@ -97,7 +105,7 @@ fn write_sheet(sheet: &mut Worksheet, l: &Labels, history: &UsageHistory) -> Res
         for d in group {
             sheet.write_string(row, 0, &d.year_month)?;
             sheet.write_string(row, 1, provider_name(d.provider))?;
-            sheet.write_string(row, 2, &d.model)?;
+            sheet.write_string(row, 2, model_label(d))?;
             for (n, value) in token_cells(d).iter().enumerate() {
                 sheet.write_number_with_format(row, 3 + n as u16, *value as f64, &tokens)?;
             }
@@ -140,7 +148,7 @@ mod tests {
         UsageRecord {
             year_month: ym.into(), provider: p, model: model.into(),
             input_tokens: i, output_tokens: o,
-            cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0,
+            cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0, fast: false,
         }
     }
 
@@ -283,6 +291,22 @@ mod tests {
         assert_eq!(ko.len(), en.len());
         assert_eq!(num(&ko[1][9]), num(&en[1][9]));
         assert_eq!(num(&ko[2][11]), num(&en[2][11]));
+    }
+
+    /// Fast and standard usage of one model are two rows. Without a marker they
+    /// read as duplicates with mismatched costs (issue #65).
+    #[test]
+    fn fast_mode_rows_are_labelled() {
+        let mut fast = rec("2026-08", ProviderId::Claude, "claude-opus-5", 1_000_000, 0);
+        fast.fast = true;
+        let standard = rec("2026-08", ProviderId::Claude, "claude-opus-5", 1_000_000, 0);
+        let h = aggregate(vec![fast, standard], "2026-08".into(), 1_700_000_000);
+        let mut wb = open(to_xlsx(&h).unwrap());
+        let r = rows(&mut wb, "Usage");
+
+        let models: Vec<String> = r[1..3].iter().map(|row| text(&row[2])).collect();
+        assert!(models.contains(&"claude-opus-5".to_string()), "got {models:?}");
+        assert!(models.contains(&"claude-opus-5 (fast)".to_string()), "got {models:?}");
     }
 
     #[test]

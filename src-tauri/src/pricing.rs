@@ -84,9 +84,23 @@ impl ModelPricing {
     }
 }
 
-/// Look up pricing by model id (case-insensitive substring match).
+/// Premium rates for a request that ran with `speed: "fast"`.
+///
+/// Fast mode runs the same model faster for more money, and is offered on Claude
+/// Opus 5 and Opus 4.8 only — it was removed on Opus 4.7, and Opus 4.6 accepts the
+/// flag but runs and bills as standard. `None` therefore means "not a fast-mode
+/// model", and the caller should fall back to [`pricing_for`] rather than treat it
+/// as unpriced. Prompt-caching multipliers apply on top of the fast rate, so every
+/// bucket moves, not just input and output.
+pub fn fast_mode_pricing(model: &str) -> Option<ModelPricing> {
+    let m = model.to_ascii_lowercase();
+    has_any(&m, &["opus-5", "opus-4-8"]).then(|| claude(10.0, 50.0, 12.50, 20.0, 1.00))
+}
+
+/// Look up standard-speed pricing by model id (case-insensitive substring match).
 /// `year_month` ("YYYY-MM") drives date-sensitive rates (e.g. Sonnet 5 intro).
 /// Returns None for unknown models so callers can flag "estimate unavailable".
+/// For fast-mode requests, try [`fast_mode_pricing`] first.
 pub fn pricing_for(model: &str, year_month: &str) -> Option<ModelPricing> {
     let m = model.to_ascii_lowercase();
 
@@ -245,6 +259,35 @@ mod tests {
     fn legacy_sonnet_never_gets_promo() {
         let p = pricing_for("claude-sonnet-4-6", "2026-07").unwrap();
         assert_eq!((p.input, p.output), (3.0, 15.0));
+    }
+
+    // --- Fast mode (issue #65) ---
+
+    #[test]
+    fn fast_mode_doubles_opus_5_across_every_bucket() {
+        let p = fast_mode_pricing("claude-opus-5").unwrap();
+        assert_eq!((p.input, p.output, p.cache_write, p.cache_write_1h, p.cache_read),
+                   (10.0, 50.0, 12.50, 20.0, 1.00));
+    }
+
+    #[test]
+    fn fast_mode_covers_opus_4_8_too() {
+        assert!(fast_mode_pricing("claude-opus-4-8").is_some());
+    }
+
+    /// Fast mode was removed on Opus 4.7 and runs at standard speed and rates on
+    /// 4.6, so a stray `speed: "fast"` on those must not upcharge the user.
+    #[test]
+    fn fast_mode_is_unavailable_on_every_other_model() {
+        for id in ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-5",
+                   "claude-fable-5", "gpt-5.6-sol"] {
+            assert!(fast_mode_pricing(id).is_none(), "{id}");
+        }
+    }
+
+    #[test]
+    fn fast_mode_rates_are_exact() {
+        assert!(fast_mode_pricing("claude-opus-5").unwrap().exact);
     }
 
     // --- Rates verified against the vendors' published pricing pages, 2026-08-10 ---

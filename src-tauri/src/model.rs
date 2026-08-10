@@ -84,6 +84,11 @@ pub struct UsageRecord {
     pub cache_write_1h_tokens: u64,
     pub cache_read_tokens: u64,
     pub cached_input_tokens: u64,
+    /// Request ran with `speed: "fast"` (Claude only). Fast mode is the same
+    /// model at premium rates, so it prices differently from an otherwise
+    /// identical record. Absent in logs predating the field, which read as false.
+    #[serde(default)]
+    pub fast: bool,
 }
 
 /// One aggregated row: (year_month × provider × model). Used for CSV detail.
@@ -114,6 +119,9 @@ pub struct MonthlyDetail {
     /// False when `cost_usd` came from a family-fallback rate rather than a
     /// verified one. Rolls up into `MonthlySummary::cost_estimable`.
     pub cost_exact: bool,
+    /// Request ran in fast mode, which bills at premium rates. Part of the
+    /// grouping key, so a model used both ways yields one row of each.
+    pub fast: bool,
 }
 
 /// One summary row: (year_month × provider). Used for the on-screen table.

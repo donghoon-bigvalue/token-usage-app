@@ -70,6 +70,8 @@ export interface MonthlyDetail {
   cost_usd: number | null;
   /** False when the rate came from a family fallback rather than a verified one. */
   cost_exact: boolean;
+  /** Request ran in fast mode, which bills at premium rates. Its own row. */
+  fast: boolean;
 }
 
 export interface UsageHistory {

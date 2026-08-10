@@ -472,6 +472,9 @@ struct ScanUsage {
     /// Per-TTL breakdown of `cache_creation_input_tokens`. Absent in older logs.
     #[serde(default)]
     cache_creation: Option<ScanCacheCreation>,
+    /// "standard" or "fast". Absent in older logs, which were all standard.
+    #[serde(default)]
+    speed: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -553,6 +556,8 @@ pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
                     .unwrap_or(0),
                 cache_read_tokens: usage.cache_read_input_tokens,
                 cached_input_tokens: 0,
+                // Only an explicit "fast" upcharges; anything else is standard.
+                fast: usage.speed.as_deref() == Some("fast"),
             });
         }
     }
@@ -749,6 +754,25 @@ mod tests {
         assert_eq!(recs.len(), 1);
         assert_eq!(recs[0].cache_write_tokens, 100);
         assert_eq!(recs[0].cache_write_1h_tokens, 80);
+    }
+
+    /// Fast mode bills at double the standard rate, so the flag has to survive
+    /// scanning rather than be inferred from the model id (issue #65).
+    #[test]
+    fn scan_usage_records_fast_mode_requests() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pdir = home.join("projects/p");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let fast = r#"{"type":"assistant","timestamp":"2026-08-01T00:00:00.000Z","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"speed":"fast"}}}"#;
+        let standard = r#"{"type":"assistant","timestamp":"2026-08-01T00:00:01.000Z","message":{"id":"m2","model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"speed":"standard"}}}"#;
+        let unstated = r#"{"type":"assistant","timestamp":"2026-08-01T00:00:02.000Z","message":{"id":"m3","model":"claude-opus-5","usage":{"input_tokens":2,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        std::fs::write(pdir.join("s.jsonl"), format!("{fast}\n{standard}\n{unstated}\n")).unwrap();
+
+        let recs = scan_usage(home);
+        assert_eq!(recs.len(), 3);
+        let flags: Vec<bool> = recs.iter().map(|r| r.fast).collect();
+        assert_eq!(flags, vec![true, false, false], "only an explicit \"fast\" counts");
     }
 
     /// Older logs have no `cache_creation` object; those writes stay 5-minute.

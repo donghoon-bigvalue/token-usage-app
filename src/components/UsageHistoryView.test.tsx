@@ -39,7 +39,7 @@ const detail = (model: string, cost_exact: boolean) => ({
   raw_input_tokens: 100, raw_output_tokens: 10,
   raw_cache_write_tokens: 0, raw_cache_write_1h_tokens: 0,
   raw_cache_read_tokens: 0, raw_cached_input_tokens: 0,
-  direct_tokens: 110, total_tokens: 110, cost_usd: 1, cost_exact,
+  direct_tokens: 110, total_tokens: 110, cost_usd: 1, cost_exact, fast: false,
 });
 
 const HISTORY_WITH_UNVERIFIED = {
