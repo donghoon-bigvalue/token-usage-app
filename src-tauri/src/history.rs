@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use crate::model::{
     MonthlyDetail, MonthlySummary, ProviderId, UsageHistory, UsageRecord,
 };
-use crate::pricing::{fast_mode_pricing, pricing_for};
+use crate::pricing::{fast_mode_pricing, long_prompt_pricing, pricing_for, ModelPricing, LONG_PROMPT_THRESHOLD};
 
 /// The four buckets the UI shows, normalized so both providers mean the same
 /// thing. Claude reports cache reads in their own field; Codex folds them into
@@ -54,6 +54,41 @@ fn display_buckets(
     }
 }
 
+/// The rates one request bills at. Decided per request because they depend on its
+/// date and, for Haiku 5.5, on its own prompt size — neither survives the monthly sum.
+fn pricing_of(r: &UsageRecord) -> Option<ModelPricing> {
+    if r.fast {
+        if let Some(p) = fast_mode_pricing(&r.model) {
+            return Some(p);
+        }
+    }
+    if r.provider == ProviderId::Claude {
+        let prompt = r.input_tokens + r.cache_write_tokens + r.cache_read_tokens;
+        if prompt > LONG_PROMPT_THRESHOLD {
+            if let Some(p) = long_prompt_pricing(&r.model) {
+                return Some(p);
+            }
+        }
+    }
+    pricing_for(&r.model, &r.date)
+}
+
+fn cost_of(r: &UsageRecord, p: &ModelPricing) -> f64 {
+    match r.provider {
+        ProviderId::Claude => p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_write_1h_tokens, r.cache_read_tokens),
+        // input already includes cached; don't double-count.
+        ProviderId::Codex => p.codex_cost(r.input_tokens, r.cached_input_tokens, r.output_tokens),
+    }
+}
+
+/// One model's month: its summed tokens, and the cost priced request by request.
+/// `cost` is None once any request has no rate.
+struct ModelBucket {
+    sum: UsageRecord,
+    cost: Option<f64>,
+    exact: bool,
+}
+
 /// Running totals for one (month, provider) summary. A tuple stopped being
 /// readable once there were six things to accumulate.
 #[derive(Default)]
@@ -73,15 +108,26 @@ struct SummaryAcc {
 /// so tests stay deterministic.
 pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i64) -> UsageHistory {
     // Sum raw token buckets.
-    let mut buckets: BTreeMap<(String, ProviderId, String, bool), UsageRecord> = BTreeMap::new();
+    let mut buckets: BTreeMap<(String, ProviderId, String, bool), ModelBucket> = BTreeMap::new();
     for r in records {
-        // Fast mode is part of the key: the same model bills differently
-        // depending on it, so the two must not be summed together.
+        let pricing = pricing_of(&r);
+        // Fast mode is part of the key so fast and standard usage of one model
+        // stay separate rows.
         let key = (r.year_month.clone(), r.provider, r.model.clone(), r.fast);
-        let e = buckets.entry(key).or_insert_with(|| UsageRecord {
-            year_month: r.year_month.clone(), provider: r.provider, model: r.model.clone(),
-            input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0, fast: r.fast,
+        let b = buckets.entry(key).or_insert_with(|| ModelBucket {
+            sum: UsageRecord {
+                year_month: r.year_month.clone(), date: String::new(), provider: r.provider, model: r.model.clone(),
+                input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0, fast: r.fast,
+            },
+            cost: Some(0.0),
+            exact: true,
         });
+        b.cost = match (b.cost, &pricing) {
+            (Some(c), Some(p)) => Some(c + cost_of(&r, p)),
+            _ => None,
+        };
+        b.exact &= pricing.map(|p| p.exact).unwrap_or(false);
+        let e = &mut b.sum;
         e.input_tokens += r.input_tokens;
         e.output_tokens += r.output_tokens;
         e.cache_write_tokens += r.cache_write_tokens;
@@ -90,27 +136,12 @@ pub fn aggregate(records: Vec<UsageRecord>, current_month: String, scanned_at: i
         e.cached_input_tokens += r.cached_input_tokens;
     }
 
-    // Details + cost.
-    let mut details: Vec<MonthlyDetail> = buckets.into_values().map(|r| {
-        // Fast mode is only offered on some models; elsewhere the flag is not a
-        // reason to upcharge, so fall through to the standard rate.
-        let pricing = r.fast
-            .then(|| fast_mode_pricing(&r.model))
-            .flatten()
-            .or_else(|| pricing_for(&r.model, &r.year_month));
-        let cost_exact = pricing.map(|p| p.exact).unwrap_or(false);
-        let (total_tokens, cost_usd) = match r.provider {
-            ProviderId::Claude => {
-                let total = r.input_tokens + r.output_tokens + r.cache_write_tokens + r.cache_read_tokens;
-                let cost = pricing.map(|p| p.claude_cost(r.input_tokens, r.output_tokens, r.cache_write_tokens, r.cache_write_1h_tokens, r.cache_read_tokens));
-                (total, cost)
-            }
-            ProviderId::Codex => {
-                // input already includes cached; don't double-count.
-                let total = r.input_tokens + r.output_tokens;
-                let cost = pricing.map(|p| p.codex_cost(r.input_tokens, r.cached_input_tokens, r.output_tokens));
-                (total, cost)
-            }
+    // Details.
+    let mut details: Vec<MonthlyDetail> = buckets.into_values().map(|b| {
+        let ModelBucket { sum: r, cost: cost_usd, exact: cost_exact } = b;
+        let total_tokens = match r.provider {
+            ProviderId::Claude => r.input_tokens + r.output_tokens + r.cache_write_tokens + r.cache_read_tokens,
+            ProviderId::Codex => r.input_tokens + r.output_tokens,
         };
         let direct_tokens = display_buckets(
             r.provider, r.input_tokens, r.output_tokens,
@@ -195,7 +226,7 @@ mod tests {
     use crate::model::{ProviderId, UsageRecord};
 
     fn claude_rec(ym: &str, model: &str, i: u64, o: u64, cw: u64, cr: u64) -> UsageRecord {
-        UsageRecord { year_month: ym.into(), provider: ProviderId::Claude, model: model.into(),
+        UsageRecord { year_month: ym.into(), date: ym.into(), provider: ProviderId::Claude, model: model.into(),
             input_tokens: i, output_tokens: o, cache_write_tokens: cw, cache_write_1h_tokens: 0, cache_read_tokens: cr, cached_input_tokens: 0, fast: false }
     }
 
@@ -204,7 +235,7 @@ mod tests {
     #[test]
     fn aggregate_sums_one_hour_cache_writes_and_prices_them_at_the_1h_rate() {
         let rec = |cw: u64, cw1h: u64| UsageRecord {
-            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            year_month: "2026-08".into(), date: "2026-08".into(), provider: ProviderId::Claude,
             model: "claude-opus-5".into(), input_tokens: 0, output_tokens: 0,
             cache_write_tokens: cw, cache_write_1h_tokens: cw1h,
             cache_read_tokens: 0, cached_input_tokens: 0, fast: false,
@@ -213,6 +244,37 @@ mod tests {
         let h = aggregate(vec![rec(600_000, 600_000), rec(400_000, 400_000)], "2026-08".into(), 0);
         let cost = h.details[0].cost_usd.unwrap();
         assert!((cost - 10.0).abs() < 1e-9, "expected the 1h rate ($10/MTok), got {cost}");
+    }
+
+    /// Prices are looked up per request, so a price cut in the middle of a month
+    /// must split that month's cost rather than repricing all of it.
+    #[test]
+    fn a_mid_month_price_cut_splits_the_months_cost() {
+        let rec = |date: &str| UsageRecord {
+            year_month: "2026-08".into(), date: date.into(), provider: ProviderId::Codex,
+            model: "gpt-5.6-sol".into(), input_tokens: 1_000_000, output_tokens: 0,
+            cache_write_tokens: 0, cache_write_1h_tokens: 0,
+            cache_read_tokens: 0, cached_input_tokens: 0, fast: false,
+        };
+        let h = aggregate(vec![rec("2026-08-20"), rec("2026-08-21")], "2026-08".into(), 0);
+        let cost = h.details[0].cost_usd.unwrap();
+        assert!((cost - 9.0).abs() < 1e-9, "expected $5 + $4, got {cost}");
+    }
+
+    /// Haiku 5.5 bills a whole request at the higher tier once its prompt, cache
+    /// included, passes 100k. A monthly sum could not tell these apart.
+    #[test]
+    fn haiku_5_5_prices_each_request_by_its_own_prompt_size() {
+        let h = aggregate(vec![
+            claude_rec("2026-10", "claude-haiku-5-5", 1_000_000, 0, 0, 0),
+            claude_rec("2026-10", "claude-haiku-5-5", 1, 0, 0, 100_000),
+            claude_rec("2026-10", "claude-haiku-5-5", 0, 0, 0, 100_000),
+        ], "2026-10".into(), 0);
+        let cost = h.details[0].cost_usd.unwrap();
+        // 1M input at $0.10 is over 100k too, so at $0.50; then 100,001 at the long
+        // rate ($0.50 input, $0.05 read); then exactly 100k at the short read rate.
+        let expected = 0.50 + (0.50 + 100_000.0 * 0.05) / 1e6 + 100_000.0 * 0.01 / 1e6;
+        assert!((cost - expected).abs() < 1e-9, "expected {expected}, got {cost}");
     }
 
     /// Manual: reads the real ~/.claude and ~/.codex logs and prints what the app
@@ -238,7 +300,7 @@ mod tests {
     #[test]
     fn fast_and_standard_usage_of_one_model_are_priced_separately() {
         let rec = |fast: bool| UsageRecord {
-            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            year_month: "2026-08".into(), date: "2026-08".into(), provider: ProviderId::Claude,
             model: "claude-opus-5".into(), input_tokens: 1_000_000, output_tokens: 0,
             cache_write_tokens: 0, cache_write_1h_tokens: 0,
             cache_read_tokens: 0, cached_input_tokens: 0, fast,
@@ -258,7 +320,7 @@ mod tests {
     #[test]
     fn a_fast_flag_on_a_model_without_fast_mode_bills_standard() {
         let h = aggregate(vec![UsageRecord {
-            year_month: "2026-08".into(), provider: ProviderId::Claude,
+            year_month: "2026-08".into(), date: "2026-08".into(), provider: ProviderId::Claude,
             model: "claude-sonnet-5".into(), input_tokens: 1_000_000, output_tokens: 0,
             cache_write_tokens: 0, cache_write_1h_tokens: 0,
             cache_read_tokens: 0, cached_input_tokens: 0, fast: true,
@@ -286,7 +348,7 @@ mod tests {
     }
 
     fn codex_rec(ym: &str, model: &str, i: u64, o: u64, cached: u64) -> UsageRecord {
-        UsageRecord { year_month: ym.into(), provider: ProviderId::Codex, model: model.into(),
+        UsageRecord { year_month: ym.into(), date: ym.into(), provider: ProviderId::Codex, model: model.into(),
             input_tokens: i, output_tokens: o, cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0,
             cached_input_tokens: cached, fast: false }
     }
