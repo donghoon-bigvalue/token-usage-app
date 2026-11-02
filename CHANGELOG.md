@@ -7,6 +7,26 @@
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-11-02
+
+최근 모델의 비용과 토큰 집계를 바로잡았습니다.
+
+> ⚠️ **지난달 금액이 달라집니다.** 2026년 9~10월 Claude 추정 비용은 내려가고, 그 이전은
+> 소폭 올라갑니다. 고쳐진 쪽이 맞는 금액입니다.
+
+### Added
+- **GPT-6 계열 요금** — `gpt-6-astra`, `gpt-6-luna`, `gpt-6-sol`, `gpt-6.1-sol`, `gpt-6.1-terra`가 비용 $0으로 빠지던 문제
+- **Haiku 5.5의 10만 토큰 초과 구간 요금** — 요청마다 프롬프트 크기로 판단합니다
+
+### Fixed
+- **Claude 출력 토큰 누락** — 스트리밍 중간 줄의 부분값으로 집계되어 출력 토큰이 약 26% 적게 잡히던 문제
+- **Codex 토큰 이중 집계** — 누적 사용량이 그대로인 `token_count` 재발행을 더하던 문제
+- **Claude 5.5 세대 과다 청구** — Opus 5.5, Sonnet 5.5, Haiku 5.5가 이전 세대 요금으로 계산되던 문제. 모델 ID를 부분 문자열이 아니라 버전 전체로 비교합니다
+- **Sonnet 5 요금** — 취소된 9월 인상이 적용되어 있던 문제
+- **Fable 5.1 / Mythos 5.1 캐시 읽기 요금**, **Opus 5.5 fast 요금**
+- **GPT-5.6 요금 인하 반영** — Luna·Terra(7/30), Sol(8/21) 인하를 요청 날짜별로 적용합니다. Sol은 11/22부터 ≈로 표시됩니다
+- **GPT-5 mini·nano·pro 계열** — 기본 모델 요금으로 계산되던 문제
+
 ## [1.0.8] - 2026-08-10
 
 비용 추정을 여러 군데 바로잡았고, 앱을 켜면 지난 사용량이 즉시 보입니다.
@@ -302,7 +322,9 @@ Claude·Codex 구독 사용량을 데스크톱에서 한눈에 보여주는 첫 
 ### Security
 - 보안 하드닝 — CSP 설정, 에러 메시지 일반화, 패닉 제거, 심링크 스킵
 
-[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.8...v1.0.9
+[1.0.8]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/donghoon-bigvalue/token-usage-app/compare/v1.0.4...v1.0.5
