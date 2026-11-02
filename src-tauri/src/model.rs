@@ -66,12 +66,21 @@ pub fn year_month_of(ts: &str) -> Option<String> {
     if ok { Some(ts[0..7].to_string()) } else { None }
 }
 
+/// `YYYY-MM-DD` prefix of a timestamp already accepted by [`year_month_of`].
+/// A truncated timestamp falls back to whatever is there, which still compares
+/// correctly against the full dates in the pricing table.
+pub fn date_of(ts: &str) -> String {
+    ts.get(0..10).unwrap_or(ts).to_string()
+}
+
 /// One raw usage sample before aggregation. Token fields carry provider-specific
 /// meaning (see Global Constraints): Claude cache fields are separate; Codex
 /// `input_tokens` already includes `cached_input_tokens`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UsageRecord {
     pub year_month: String,
+    /// `YYYY-MM-DD` (UTC) of the sample; rates can change mid-month.
+    pub date: String,
     pub provider: ProviderId,
     pub model: String,
     pub input_tokens: u64,

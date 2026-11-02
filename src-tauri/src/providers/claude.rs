@@ -1,6 +1,6 @@
-use crate::model::{iso8601_to_epoch, year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId};
+use crate::model::{date_of, iso8601_to_epoch, year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use thiserror::Error;
@@ -514,11 +514,14 @@ fn walk_jsonl(dir: &Path) -> Vec<PathBuf> {
 /// Claude Code splits a single API response across several `assistant` lines and
 /// repeats the *same* `usage` block on each of them, so summing every line
 /// overcounts by roughly 2.5x (issue #42). Dedup on `(message.id, requestId)`,
-/// the same key `ccusage` uses. The set is scan-global, not per-file. Lines
+/// the same key `ccusage` uses. The map is scan-global, not per-file. Lines
 /// missing either key can't be deduped safely, so they are counted as-is.
+///
+/// The repeats are not always identical: lines written mid-stream carry a partial
+/// `output_tokens`, so a repeat folds in the larger count rather than being dropped.
 pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
     let mut out = Vec::new();
-    let mut seen: HashSet<(String, String)> = HashSet::new();
+    let mut seen: HashMap<(String, String), usize> = HashMap::new();
     for path in walk_jsonl(&claude_home.join("projects")) {
         let Ok(content) = std::fs::read_to_string(&path) else { continue };
         for line in content.lines() {
@@ -526,11 +529,6 @@ pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
             if l.kind.as_deref() != Some("assistant") { continue; }
             let (Some(ts), Some(msg)) = (l.timestamp, l.message) else { continue };
             let Some(usage) = msg.usage else { continue };
-            if let (Some(id), Some(req)) = (msg.id.as_deref(), l.request_id.as_deref()) {
-                if !seen.insert((id.to_string(), req.to_string())) {
-                    continue;
-                }
-            }
             // Claude Code emits synthetic assistant messages (model:"<synthetic>")
             // with all-zero usage; skip them so they don't create junk zero-token
             // rows or flip `cost_estimable` to false for an unpriced model.
@@ -541,8 +539,18 @@ pub fn scan_usage(claude_home: &Path) -> Vec<UsageRecord> {
             {
                 continue;
             }
+            let key = msg.id.clone().zip(l.request_id.clone());
+            if let Some(&at) = key.as_ref().and_then(|k| seen.get(k)) {
+                let r: &mut UsageRecord = &mut out[at];
+                r.output_tokens = r.output_tokens.max(usage.output_tokens);
+                continue;
+            }
             let Some(ym) = year_month_of(&ts) else { continue };
+            if let Some(k) = key {
+                seen.insert(k, out.len());
+            }
             out.push(UsageRecord {
+                date: date_of(&ts),
                 year_month: ym,
                 provider: ProviderId::Claude,
                 model: msg.model.unwrap_or_else(|| "unknown".to_string()),
@@ -810,6 +818,33 @@ mod tests {
         assert_eq!(recs.iter().map(|r| r.output_tokens).sum::<u64>(), 23);
         assert_eq!(recs.iter().map(|r| r.cache_write_tokens).sum::<u64>(), 30);
         assert_eq!(recs.iter().map(|r| r.cache_read_tokens).sum::<u64>(), 40);
+    }
+
+    /// 스트리밍 중간 줄의 output_tokens는 부분값이다. 같은 응답의 최종값으로 집계해야 한다.
+    #[test]
+    fn scan_usage_keeps_the_final_output_count_of_a_streamed_response() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("projects/p");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let line = |o: u64| format!(r#"{{"type":"assistant","timestamp":"2026-07-08T06:09:03.964Z","requestId":"r","message":{{"id":"m","model":"claude-sonnet-5","usage":{{"input_tokens":5,"output_tokens":{o}}}}}}}"#);
+        std::fs::write(pdir.join("a.jsonl"), format!("{}\n{}\n{}\n", line(1), line(400), line(400))).unwrap();
+        let recs = scan_usage(dir.path());
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].output_tokens, 400);
+        assert_eq!(recs[0].input_tokens, 5);
+    }
+
+    /// 첫 줄의 사용량이 전부 0이어도 뒤따르는 실제 값을 버리면 안 된다.
+    #[test]
+    fn scan_usage_does_not_let_an_all_zero_first_line_swallow_the_response() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("projects/p");
+        std::fs::create_dir_all(&pdir).unwrap();
+        let line = |o: u64| format!(r#"{{"type":"assistant","timestamp":"2026-07-08T06:09:03.964Z","requestId":"r","message":{{"id":"m","model":"claude-sonnet-5","usage":{{"output_tokens":{o}}}}}}}"#);
+        std::fs::write(pdir.join("a.jsonl"), format!("{}\n{}\n", line(0), line(30))).unwrap();
+        let recs = scan_usage(dir.path());
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].output_tokens, 30);
     }
 
     /// 키가 결측이면 dedup 대상에서 빼고 그대로 계상한다 (과소 집계 방지).

@@ -146,7 +146,7 @@ mod tests {
 
     fn rec(ym: &str, p: ProviderId, model: &str, i: u64, o: u64) -> UsageRecord {
         UsageRecord {
-            year_month: ym.into(), provider: p, model: model.into(),
+            year_month: ym.into(), date: ym.into(), provider: p, model: model.into(),
             input_tokens: i, output_tokens: o,
             cache_write_tokens: 0, cache_write_1h_tokens: 0, cache_read_tokens: 0, cached_input_tokens: 0, fast: false,
         }

@@ -1,5 +1,5 @@
 use crate::model::{
-    year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId,
+    date_of, year_month_of, LimitWindow, ProviderId, Source, UsageRecord, UsageSnapshot, WindowId,
 };
 use base64::Engine;
 use serde::Deserialize;
@@ -597,11 +597,16 @@ struct ScanLine {
 /// no `"type"` key for these lines. `token_count` events, by contrast, are
 /// wrapped in an `event_msg` envelope with the discriminant INSIDE `payload`
 /// (`{"type":"event_msg","payload":{"type":"token_count",...}}`).
+///
+/// Codex re-emits `token_count` without new usage (the same `last_token_usage`
+/// under an unchanged `total_token_usage`), so an event only counts if the running
+/// total moved. Logs without a total can't be checked and are counted as-is.
 pub fn scan_usage(codex_home: &Path) -> Vec<UsageRecord> {
     let mut out = Vec::new();
     for path in walk_jsonl(&codex_home.join("sessions")) {
         let Ok(content) = std::fs::read_to_string(&path) else { continue };
         let mut current_model = "unknown".to_string();
+        let mut last_total: Option<serde_json::Value> = None;
         for line in content.lines() {
             let Ok(l) = serde_json::from_str::<ScanLine>(line) else { continue };
             if l.kind.as_deref() == Some("turn_context") {
@@ -618,13 +623,19 @@ pub fn scan_usage(codex_home: &Path) -> Vec<UsageRecord> {
             let Some(payload) = l.payload.as_ref() else { continue };
             if payload.get("type").and_then(|v| v.as_str()) == Some("token_count") {
                 let Some(ym) = l.timestamp.as_deref().and_then(year_month_of) else { continue };
-                let Some(last) = payload.get("info").and_then(|i| i.get("last_token_usage")) else { continue };
+                let Some(info) = payload.get("info") else { continue };
+                let Some(last) = info.get("last_token_usage") else { continue };
+                if let Some(total) = info.get("total_token_usage") {
+                    if last_total.as_ref() == Some(total) { continue; }
+                    last_total = Some(total.clone());
+                }
                 let get = |k: &str| last.get(k).and_then(|v| v.as_u64()).unwrap_or(0);
                 let input = get("input_tokens");
                 let cached = get("cached_input_tokens");
                 let output = get("output_tokens");
                 if input == 0 && output == 0 { continue; }
                 out.push(UsageRecord {
+                    date: l.timestamp.as_deref().map(date_of).unwrap_or_default(),
                     year_month: ym,
                     provider: ProviderId::Codex,
                     model: current_model.clone(),
@@ -818,6 +829,18 @@ mod tests {
         assert!(json.contains("73"));
         assert!(mtime > 0, "mtime should be a real unix timestamp");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn scan_usage_skips_token_counts_whose_running_total_did_not_move() {
+        let dir = tempfile::tempdir().unwrap();
+        let sdir = dir.path().join("sessions/2026/07/14");
+        std::fs::create_dir_all(&sdir).unwrap();
+        let ctx = r#"{"type":"turn_context","timestamp":"2026-07-14T00:00:00.000Z","payload":{"model":"gpt-5.5"}}"#;
+        let tc = |sec: u8, total: u64| format!(r#"{{"type":"event_msg","timestamp":"2026-07-14T00:01:{sec:02}.000Z","payload":{{"type":"token_count","info":{{"total_token_usage":{{"total_tokens":{total}}},"last_token_usage":{{"input_tokens":100,"output_tokens":10}}}}}}}}"#);
+        // Re-emitted once (same total), then a genuinely new, identically sized turn.
+        std::fs::write(sdir.join("r.jsonl"), format!("{ctx}\n{}\n{}\n{}\n", tc(1, 110), tc(2, 110), tc(3, 220))).unwrap();
+        assert_eq!(scan_usage(dir.path()).len(), 2);
     }
 
     #[test]
